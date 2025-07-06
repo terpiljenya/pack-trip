@@ -303,6 +303,142 @@ async def check_voting_consensus(trip_id: str, db: Session):
             await generate_detailed_trip_plan(trip_id, winning_option, db)
 
 
+async def check_availability_consensus(trip_id: str, db: Session):
+    """Check if availability consensus has been reached and generate trip options if so."""
+    # Get all participants and availability
+    participants = db.query(TripParticipant).filter(TripParticipant.trip_id == trip_id).all()
+    availability = db.query(DateAvailability).filter(DateAvailability.trip_id == trip_id).all()
+    
+    if not participants or not availability:
+        return
+    
+    # Group availability by date
+    availability_by_date = {}
+    for avail in availability:
+        date_str = avail.date.strftime("%Y-%m-%d")
+        if date_str not in availability_by_date:
+            availability_by_date[date_str] = []
+        availability_by_date[date_str].append(avail)
+    
+    # Find dates where everyone is available
+    total_participants = len(participants)
+    consensus_dates = []
+    
+    for date_str, date_availability in availability_by_date.items():
+        # Count unique participants who are available on this date
+        available_participants = set(
+            avail.user_id for avail in date_availability if avail.available
+        )
+        
+        if len(available_participants) == total_participants:
+            consensus_dates.append(date_str)
+    
+    # Check if we have enough consensus dates (3 or more)
+    if len(consensus_dates) >= 3:
+        # Check if trip options already exist
+        existing_options = db.query(TripOption).filter(TripOption.trip_id == trip_id).all()
+        
+        if not existing_options:
+            # Generate trip options
+            await generate_trip_options_internal(trip_id, consensus_dates, db)
+
+
+async def generate_trip_options_internal(trip_id: str, consensus_dates: list, db: Session):
+    """Internal function to generate trip options when consensus is reached."""
+    try:
+        # Get trip details
+        trip = db.query(Trip).filter(Trip.trip_id == trip_id).first()
+        if not trip:
+            return
+        
+        # Create trip options
+        options = [
+            {
+                "option_id": "cultural",
+                "type": "itinerary",
+                "title": "Cultural Explorer",
+                "description": "Immerse yourself in art, history, and local traditions with visits to world-class museums, historic neighborhoods, and cultural landmarks.",
+                "price": 1200,
+                "image": "https://images.unsplash.com/photo-1539037116277-4db20889f2d4?w=400&h=300&fit=crop",
+                "meta_data": {
+                    "duration": "3 days",
+                    "highlights": ["Museums", "Historic Sites", "Local Culture"],
+                    "activity_level": "Moderate",
+                    "consensus_dates": consensus_dates
+                }
+            },
+            {
+                "option_id": "beach_nightlife",
+                "type": "itinerary", 
+                "title": "Beach & Nightlife",
+                "description": "Perfect blend of relaxation and excitement with beach days, waterfront dining, and vibrant nightlife experiences.",
+                "price": 1400,
+                "image": "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400&h=300&fit=crop",
+                "meta_data": {
+                    "duration": "3 days",
+                    "highlights": ["Beach Time", "Nightlife", "Coastal Dining"],
+                    "activity_level": "High",
+                    "consensus_dates": consensus_dates
+                }
+            },
+            {
+                "option_id": "balanced",
+                "type": "itinerary",
+                "title": "Balanced Experience", 
+                "description": "The best of both worlds combining cultural discoveries with leisure time, perfect for groups with diverse interests.",
+                "price": 1300,
+                "image": "https://images.unsplash.com/photo-1508672019048-805c876b67e2?w=400&h=300&fit=crop",
+                "meta_data": {
+                    "duration": "3 days",
+                    "highlights": ["Culture", "Food", "Relaxation"],
+                    "activity_level": "Moderate",
+                    "consensus_dates": consensus_dates
+                }
+            }
+        ]
+        
+        # Save options to database
+        for option_data in options:
+            db_option = TripOption(
+                trip_id=trip_id,
+                option_id=option_data["option_id"],
+                type=option_data["type"],
+                title=option_data["title"],
+                description=option_data["description"],
+                price=option_data["price"],
+                image=option_data["image"],
+                meta_data=option_data["meta_data"]
+            )
+            db.add(db_option)
+        
+        # Create system message about consensus
+        consensus_message = f"🎉 **Consensus Reached!**\n\nGreat news! Everyone is available on {len(consensus_dates)} dates. I've found the perfect overlap in your schedules and generated 3 fantastic itinerary options for your Barcelona trip.\n\n📅 **Available dates for everyone:**\n" + "\n".join(f"• {date}" for date in consensus_dates[:3]) + "\n\nVote for your favorite option below!"
+        
+        db_message = Message(
+            trip_id=trip_id,
+            user_id=None,
+            type="system",
+            content=consensus_message
+        )
+        db.add(db_message)
+        
+        # Update trip state
+        trip.state = "VOTING_HIGH_LEVEL"
+        db.commit()
+        
+        # Broadcast the consensus reached event
+        await manager.broadcast_to_trip(
+            trip_id, {
+                "type": "consensus_reached",
+                "message": schemas.Message.from_orm(db_message).dict(),
+                "options": [schemas.TripOption.from_orm(opt).dict() for opt in db.query(TripOption).filter(TripOption.trip_id == trip_id).all()],
+                "timestamp": datetime.utcnow().isoformat()
+            })
+        
+    except Exception as e:
+        print(f"Error generating trip options: {e}")
+
+
 async def generate_detailed_trip_plan(trip_id: str, winning_option: TripOption, db: Session):
     """Generate detailed trip plan using OpenAI for the winning option."""
     try:
@@ -577,6 +713,9 @@ async def set_availability(trip_id: str,
         db.add(db_availability)
 
     db.commit()
+
+    # Check for availability consensus after updating
+    await check_availability_consensus(trip_id, db)
 
     # Broadcast availability update
     await manager.broadcast_to_trip(

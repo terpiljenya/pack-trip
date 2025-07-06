@@ -155,6 +155,12 @@ The application uses a PostgreSQL database with the following main entities:
   - Made roadmap the default active tab
   - Fixed reset to include Alice and Bob's preferences and availability
   - Updated TripState type to include DETAILED_PLAN_READY state
+- July 06, 2025. Moved availability consensus logic to backend:
+  - Created `check_availability_consensus` function in backend
+  - Integrated with `set_availability` endpoint to check consensus automatically
+  - Removed duplicate frontend consensus checking logic and polling
+  - Backend now handles consensus detection and trip option generation seamlessly
+  - Improved architecture by centralizing consensus logic server-side
 
 ## Next Steps Plan
 
