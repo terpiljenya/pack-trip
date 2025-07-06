@@ -232,7 +232,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const data = insertDateAvailabilitySchema.parse({
         ...req.body,
-        tripId: req.params.tripId
+        tripId: req.params.tripId,
+        date: new Date(req.body.date)
       });
       
       await storage.setDateAvailability(data);
@@ -243,6 +244,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
         availability: data,
         timestamp: new Date().toISOString()
       });
+
+      // Check if we have enough availability data to proceed
+      const availability = await storage.getDateAvailability(req.params.tripId);
+      const participants = await storage.getParticipants(req.params.tripId);
+      const dateStrings = availability.map(a => a.date.toDateString());
+      const uniqueDates = Array.from(new Set(dateStrings));
+      
+      // If we have availability from most participants, trigger AI response
+      if (uniqueDates.length >= 5 && availability.length >= participants.length * 3) {
+        // Add AI agent message about proceeding to voting
+        setTimeout(async () => {
+          await storage.createMessage({
+            tripId: req.params.tripId,
+            userId: null,
+            type: 'agent',
+            content: 'Great! I can see everyone has shared their availability. Based on your preferences, I have 3 fantastic itinerary options for Barcelona. Let me know which one excites you most!'
+          });
+
+          broadcastToTrip(req.params.tripId, {
+            type: 'new_message',
+            timestamp: new Date().toISOString()
+          });
+
+          // Update trip state
+          await storage.updateTripState(req.params.tripId, 'VOTING_HIGH_LEVEL');
+        }, 1500);
+      }
       
       res.json({ success: true });
     } catch (error) {
@@ -294,6 +322,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
     userId: 2,
     type: 'user',
     content: 'Perfect! October works for me. I\'m flexible on dates but prefer mid-month. Budget looks good too! 👍'
+  });
+
+  await storage.createMessage({
+    tripId: 'BCN-2024-001',
+    userId: null,
+    type: 'agent',
+    content: 'Excellent! Barcelona in October is a fantastic choice. Now let\'s coordinate your dates - I need everyone to mark their availability on the calendar below. Click on the dates you\'re available to travel!'
   });
 
   // Add itinerary options

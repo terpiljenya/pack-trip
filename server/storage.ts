@@ -94,7 +94,8 @@ export class MemStorage implements IStorage {
     const user: User = { 
       ...insertUser, 
       id,
-      color: insertUser.color || "#2864FF"
+      color: insertUser.color || "#2864FF",
+      avatar: insertUser.avatar || null
     };
     this.users.set(id, user);
     return user;
@@ -109,6 +110,11 @@ export class MemStorage implements IStorage {
     const trip: Trip = {
       ...insertTrip,
       id,
+      state: insertTrip.state || "INIT",
+      destination: insertTrip.destination || null,
+      startDate: insertTrip.startDate || null,
+      endDate: insertTrip.endDate || null,
+      budget: insertTrip.budget || null,
       createdAt: new Date(),
       updatedAt: new Date()
     };
@@ -161,6 +167,9 @@ export class MemStorage implements IStorage {
     const message: Message = {
       ...insertMessage,
       id,
+      type: insertMessage.type || "user",
+      userId: insertMessage.userId || null,
+      metadata: insertMessage.metadata || null,
       timestamp: new Date()
     };
     
@@ -205,6 +214,10 @@ export class MemStorage implements IStorage {
     const option: TripOption = {
       ...insertOption,
       id,
+      image: insertOption.image || null,
+      description: insertOption.description || null,
+      price: insertOption.price || null,
+      metadata: insertOption.metadata || null,
       createdAt: new Date()
     };
     
@@ -223,7 +236,8 @@ export class MemStorage implements IStorage {
     const id = this.currentAvailabilityId++;
     const availability: DateAvailability = {
       ...insertAvailability,
-      id
+      id,
+      available: insertAvailability.available !== undefined ? insertAvailability.available : true
     };
     
     const availabilities = this.dateAvailability.get(insertAvailability.tripId) || [];

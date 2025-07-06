@@ -86,8 +86,8 @@ export default function ChatMessage({
   }
 
   if (isAgent) {
-    const showCalendar = message.content.includes('calendar') || message.content.includes('dates');
-    const showOptions = message.content.includes('itinerary options');
+    const showCalendar = message.content.includes('calendar') || message.content.includes('dates') || message.content.includes('availability');
+    const showOptions = message.content.includes('itinerary options') || message.content.includes('3 fantastic itinerary options');
     const showConflict = message.content.includes('conflict');
 
     return (
