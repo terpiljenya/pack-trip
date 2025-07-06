@@ -1,15 +1,15 @@
-import { Bot, User } from 'lucide-react';
-import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
-import { Badge } from '@/components/ui/badge';
-import CalendarMatrix from './CalendarMatrix';
-import ConflictBanner from './ConflictBanner';
-import ItineraryCard from './ItineraryCard';
+import { Bot, User, LocationEdit } from "lucide-react";
+import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
+import { Badge } from "@/components/ui/badge";
+import CalendarMatrix from "./CalendarMatrix";
+import ConflictBanner from "./ConflictBanner";
+import ItineraryCard from "./ItineraryCard";
 
 interface ChatMessageProps {
   message: {
     id: number;
     userId: number | null;
-    type: 'user' | 'agent' | 'system';
+    type: "user" | "agent" | "system";
     content: string;
     timestamp: Date;
     metadata?: any;
@@ -58,22 +58,23 @@ export default function ChatMessage({
   availability,
   onVote,
   onSetAvailability,
-  userId
+  userId,
 }: ChatMessageProps) {
   // Convert both to numbers to ensure proper comparison
-  const participant = participants.find(p => Number(p.userId) === Number(message.userId));
-  const isSystem = message.type === 'system';
-  const isAgent = message.type === 'agent';
-  const isUser = message.type === 'user';
+  const participant = participants.find(
+    (p) => Number(p.userId) === Number(message.userId),
+  );
+  const isSystem = message.type === "system";
+  const isAgent = message.type === "agent";
+  const isUser = message.type === "user";
 
   if (isSystem) {
     return (
       <div className="flex justify-center">
         <div className="bg-white rounded-2xl p-4 shadow-sm max-w-md text-center">
           <div className="w-12 h-12 bg-primary rounded-full flex items-center justify-center mx-auto mb-3">
-            <Bot className="w-6 h-6 text-white" />
+            <LocationEdit className="w-6 h-6 text-white" />
           </div>
-          <h3 className="font-semibold text-slate-900 mb-2">Welcome to PackTrip AI!</h3>
           <p className="text-sm text-slate-600 mb-4">{message.content}</p>
           <div className="text-xs text-slate-500">
             <span className="inline-flex items-center">
@@ -88,9 +89,15 @@ export default function ChatMessage({
 
   if (isAgent) {
     // Only show calendar when explicitly mentioning "mark their availability on the calendar below"
-    const showCalendar = message.content.includes('mark their availability on the calendar below') || message.content.includes('mark your availability on the calendar below');
-    const showOptions = message.content.includes('itinerary options') || message.content.includes('3 fantastic itinerary options');
-    const showConflict = message.content.includes('conflict');
+    const showCalendar =
+      message.content.includes(
+        "mark their availability on the calendar below",
+      ) ||
+      message.content.includes("mark your availability on the calendar below");
+    const showOptions =
+      message.content.includes("itinerary options") ||
+      message.content.includes("3 fantastic itinerary options");
+    const showConflict = message.content.includes("conflict");
 
     return (
       <div className="flex items-start space-x-3">
@@ -108,7 +115,7 @@ export default function ChatMessage({
           </div>
           <div className="bg-slate-100 rounded-2xl p-4 shadow-sm">
             <p className="text-slate-800 mb-3">{message.content}</p>
-            
+
             {showCalendar && (
               <CalendarMatrix
                 availability={availability}
@@ -117,33 +124,41 @@ export default function ChatMessage({
                 userId={userId}
               />
             )}
-            
+
             {showOptions && (
               <div className="space-y-4">
-                {options.filter(opt => opt.type === 'itinerary').length > 0 ? (
-                  options.filter(opt => opt.type === 'itinerary').map((option) => (
-                    <ItineraryCard
-                      key={option.id}
-                      option={option}
-                      votes={votes.filter(v => v.optionId === option.optionId)}
-                      participants={participants}
-                      onVote={onVote}
-                      userId={userId}
-                    />
-                  ))
+                {options.filter((opt) => opt.type === "itinerary").length >
+                0 ? (
+                  options
+                    .filter((opt) => opt.type === "itinerary")
+                    .map((option) => (
+                      <ItineraryCard
+                        key={option.id}
+                        option={option}
+                        votes={votes.filter(
+                          (v) => v.optionId === option.optionId,
+                        )}
+                        participants={participants}
+                        onVote={onVote}
+                        userId={userId}
+                      />
+                    ))
                 ) : (
-                  <div className="text-sm text-slate-500">Loading options...</div>
+                  <div className="text-sm text-slate-500">
+                    Loading options...
+                  </div>
                 )}
               </div>
             )}
-            
+
             {showConflict && (
               <ConflictBanner
                 conflicts={[
                   {
-                    message: "Bob is unavailable Oct 14-17. Consider dates after Oct 18th for full group availability.",
-                    severity: "warning"
-                  }
+                    message:
+                      "Bob is unavailable Oct 14-17. Consider dates after Oct 18th for full group availability.",
+                    severity: "warning",
+                  },
                 ]}
               />
             )}
@@ -156,23 +171,26 @@ export default function ChatMessage({
   return (
     <div className="flex items-start space-x-3">
       <Avatar className="w-8 h-8">
-        <AvatarFallback 
+        <AvatarFallback
           className="text-white font-medium"
-          style={{ backgroundColor: participant?.color || '#2864FF' }}
+          style={{ backgroundColor: participant?.color || "#2864FF" }}
         >
-          {participant?.displayName?.[0] || 'U'}
+          {participant?.displayName?.[0] || "U"}
         </AvatarFallback>
       </Avatar>
       <div className="flex-1">
         <div className="flex items-center space-x-2 mb-1">
           <span className="font-medium text-slate-900">
-            {participant?.displayName || 'Unknown User'}
+            {participant?.displayName || "Unknown User"}
           </span>
           <span className="text-xs text-slate-500">
             {message.timestamp.toLocaleTimeString()}
           </span>
           {participant?.isOnline && (
-            <Badge variant="secondary" className="bg-green-100 text-green-800 text-xs">
+            <Badge
+              variant="secondary"
+              className="bg-green-100 text-green-800 text-xs"
+            >
               Online
             </Badge>
           )}
