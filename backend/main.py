@@ -398,14 +398,14 @@ async def generate_trip_options(trip_id: str, db: Session = Depends(get_db)):
     trip = db.query(Trip).filter(Trip.trip_id == trip_id).first()
     if not trip:
         raise HTTPException(status_code=404, detail="Trip not found")
-    
+
     # Check if options already exist
-    existing_options = db.query(TripOption).filter(
-        TripOption.trip_id == trip_id
-    ).count()
-    
-    if existing_options > 0:
-        return {"success": False, "message": "Options already generated"}
+    # existing_options = db.query(TripOption).filter(
+    #     TripOption.trip_id == trip_id
+    # ).count()
+
+    # if existing_options > 0:
+    #     return {"success": False, "message": "Options already generated"}
 
     # Get all participants preferences
     preferences = db.query(UserPreferences).filter(
@@ -431,8 +431,8 @@ async def generate_trip_options(trip_id: str, db: Session = Depends(get_db)):
         if count == total_participants
     ]
 
-    if len(consensus_dates) < 3:
-        return {"error": "Not enough consensus dates to plan a trip"}
+    # if len(consensus_dates) < 3:
+    #     return {"error": "Not enough consensus dates to plan a trip"}
 
     # Mock options for now
     options = [{
@@ -495,33 +495,31 @@ async def generate_trip_options(trip_id: str, db: Session = Depends(get_db)):
     }]
 
     # Save options to database
-    for opt in options:
-        # Check if option already exists
-        existing = db.query(TripOption).filter(
-            TripOption.trip_id == trip_id,
-            TripOption.option_id == opt["option_id"]).first()
+    # for opt in options:
+    #     # Check if option already exists
+    #     existing = db.query(TripOption).filter(
+    #         TripOption.trip_id == trip_id,
+    #         TripOption.option_id == opt["option_id"]).first()
 
-        if not existing:
-            db_option = TripOption(trip_id=trip_id, **opt)
-            db.add(db_option)
+    #     if not existing:
+    #         db_option = TripOption(trip_id=trip_id, **opt)
+    #         db.add(db_option)
 
-    # Check if options message already exists
-    existing_message = db.query(Message).filter(
-        Message.trip_id == trip_id,
-        Message.type == "agent",
-        Message.content.like("%3 fantastic itinerary options%")
-    ).first()
-    
-    if not existing_message:
-        # Add AI message
-        ai_message = Message(
-            trip_id=trip_id,
-            user_id=None,
-            type="agent",
-            content=
-            f"Great! I can see everyone has shared their availability. I found {len(consensus_dates)} dates where everyone is available. Based on your preferences, I have 3 fantastic itinerary options for Barcelona. Let me know which one excites you most!"
-        )
-        db.add(ai_message)
+    # # Check if options message already exists
+    # existing_message = db.query(Message).filter(
+    #     Message.trip_id == trip_id, Message.type == "agent",
+    #     Message.content.like("%3 fantastic itinerary options%")).first()
+
+    # if not existing_message:
+    #     # Add AI message
+    ai_message = Message(
+        trip_id=trip_id,
+        user_id=None,
+        type="agent",
+        content=
+        f"Great! I can see everyone has shared their availability. I found {len(consensus_dates)} dates where everyone is available. Based on your preferences - {', '.join([f'{pref.budget_preference} budget, {pref.accommodation_type} accommodation, {pref.travel_style} travel style' for pref in preferences])}, I have 3 fantastic itinerary options for Barcelona. Let me know which one excites you most!"
+    )
+    db.add(ai_message)
 
     # Update trip state
     trip.state = "VOTING_HIGH_LEVEL"
@@ -839,45 +837,45 @@ async def startup_event():
         db.add(message)
     db.commit()
 
-    # Add itinerary options
-    options = [
-        TripOption(
-            trip_id="BCN-2024-001",
-            option_id="culture-history",
-            type="itinerary",
-            title="Culture & History Focus",
-            description=
-            "Gothic Quarter walks, Sagrada Familia, Picasso Museum, authentic tapas tours",
-            price=1150,
-            image=
-            "https://images.unsplash.com/photo-1558642452-9d2a7deb7f62?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=800&h=200"
-        ),
-        TripOption(
-            trip_id="BCN-2024-001",
-            option_id="beach-nightlife",
-            type="itinerary",
-            title="Beach & Nightlife",
-            description=
-            "Barceloneta Beach, rooftop bars, beach clubs, sunset sailing",
-            price=1280,
-            image=
-            "https://images.unsplash.com/photo-1523531294919-4bcd7c65e216?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=800&h=200"
-        ),
-        TripOption(
-            trip_id="BCN-2024-001",
-            option_id="food-architecture",
-            type="itinerary",
-            title="Food & Architecture",
-            description=
-            "Park Güell, cooking classes, food markets, Gaudí architecture tour",
-            price=1200,
-            image=
-            "https://images.unsplash.com/photo-1539037116277-4db20889f2d4?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=800&h=200"
-        )
-    ]
+    # # Add itinerary options
+    # options = [
+    #     TripOption(
+    #         trip_id="BCN-2024-001",
+    #         option_id="culture-history",
+    #         type="itinerary",
+    #         title="Culture & History Focus",
+    #         description=
+    #         "Gothic Quarter walks, Sagrada Familia, Picasso Museum, authentic tapas tours",
+    #         price=1150,
+    #         image=
+    #         "https://images.unsplash.com/photo-1558642452-9d2a7deb7f62?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=800&h=200"
+    #     ),
+    #     TripOption(
+    #         trip_id="BCN-2024-001",
+    #         option_id="beach-nightlife",
+    #         type="itinerary",
+    #         title="Beach & Nightlife",
+    #         description=
+    #         "Barceloneta Beach, rooftop bars, beach clubs, sunset sailing",
+    #         price=1280,
+    #         image=
+    #         "https://images.unsplash.com/photo-1523531294919-4bcd7c65e216?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=800&h=200"
+    #     ),
+    #     TripOption(
+    #         trip_id="BCN-2024-001",
+    #         option_id="food-architecture",
+    #         type="itinerary",
+    #         title="Food & Architecture",
+    #         description=
+    #         "Park Güell, cooking classes, food markets, Gaudí architecture tour",
+    #         price=1200,
+    #         image=
+    #         "https://images.unsplash.com/photo-1539037116277-4db20889f2d4?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=800&h=200"
+    #     )
+    # ]
 
-    for option in options:
-        db.add(option)
+    # for option in options:
+    #     db.add(option)
     db.commit()
 
 

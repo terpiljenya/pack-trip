@@ -80,33 +80,34 @@ export default function ChatPage() {
 
   // Track if we're currently generating options to prevent duplicate calls
   const [isGeneratingOptions, setIsGeneratingOptions] = useState(false);
-  
+
   // Check for consensus and trigger trip planning
   useEffect(() => {
     if (!tripContext) return;
-    
+
     // Only check for consensus if we're in the date collection phase
     // and haven't already shown the planning message
-    if (tripContext.state !== 'COLLECTING_DATES') return;
-    
+    if (tripContext.state !== "COLLECTING_DATES") return;
+
     // If we're already generating options, don't trigger again
     if (isGeneratingOptions) return;
-    
+
     // Check if we already have options in the system
-    if (tripContext.options.length > 0) return;
-    
+    // if (tripContext.options.length > 0) return;
+
     // Check if we already have the message about options
-    const hasOptionsMessage = tripContext.messages.some(msg => 
-      msg.type === 'agent' && 
-      msg.content.includes('3 fantastic itinerary options')
+    const hasOptionsMessage = tripContext.messages.some(
+      (msg) =>
+        msg.type === "agent" &&
+        msg.content.includes("3 fantastic itinerary options"),
     );
-    
+
     if (hasOptionsMessage) return;
-    
+
     // Count dates where everyone is available
     const dateAvailability: { [key: string]: Set<number> } = {};
-    
-    tripContext.availability.forEach(avail => {
+
+    tripContext.availability.forEach((avail) => {
       if (avail.available) {
         const dateKey = avail.date.toDateString();
         if (!dateAvailability[dateKey]) {
@@ -115,28 +116,34 @@ export default function ChatPage() {
         dateAvailability[dateKey].add(avail.userId);
       }
     });
-    
+
     // Find dates where everyone is available
     const totalParticipants = tripContext.participants.length;
     const consensusDates = Object.entries(dateAvailability)
       .filter(([_, users]) => users.size === totalParticipants)
       .map(([date]) => date);
-    
+
     // Check if all participants have marked some dates
-    const participantsWithDates = new Set(tripContext.availability.map(a => a.userId));
-    const allParticipantsMarkedDates = participantsWithDates.size === totalParticipants;
-    
+    const participantsWithDates = new Set(
+      tripContext.availability.map((a) => a.userId),
+    );
+    const allParticipantsMarkedDates =
+      participantsWithDates.size === totalParticipants;
+
     // If we have at least 3 consensus dates and all participants have marked dates
     if (consensusDates.length >= 3 && allParticipantsMarkedDates) {
       // Set generating flag to prevent duplicate calls
-      setIsGeneratingOptions(true);
-      
+
       // Small delay to ensure all participants have marked their dates
       const timer = setTimeout(async () => {
         try {
-          const response = await apiRequest('POST', `/api/trips/${tripId}/generate-options`);
+          setIsGeneratingOptions(true);
+          const response = await apiRequest(
+            "POST",
+            `/api/trips/${tripId}/generate-options`,
+          );
           const data = await response.json();
-          
+
           if (data.success) {
             toast({
               title: "Trip options generated!",
@@ -144,12 +151,12 @@ export default function ChatPage() {
             });
           }
         } catch (error) {
-          console.error('Failed to generate options:', error);
+          console.error("Failed to generate options:", error);
           // Reset the flag on error
           setIsGeneratingOptions(false);
         }
       }, 2000);
-      
+
       return () => {
         clearTimeout(timer);
         // Reset flag if component unmounts
