@@ -112,6 +112,12 @@ The application uses a PostgreSQL database with the following main entities:
   - Created dev.py script to run both Vite and FastAPI
   - Python backend now running (manual start required)
   - Note: Workflow configuration needs manual update
+- July 06, 2025. Added collaborative features:
+  - Implemented preferences dialog for new users joining trips
+  - Simplified calendar interface for marking availability
+  - Added reset chat functionality to restart from initial state
+  - Calendar shows green dates when everyone is available
+  - Tooltips display who's available on each date
 
 ## User Preferences
 

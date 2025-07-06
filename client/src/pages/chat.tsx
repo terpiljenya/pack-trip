@@ -2,7 +2,7 @@ import { useParams } from 'wouter';
 import { useTripState } from '@/hooks/useTripState';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { useState, useEffect } from 'react';
-import { Plane, Users, Calendar, MapPin, Menu, X } from 'lucide-react';
+import { Plane, Users, Calendar, MapPin, Menu, X, RotateCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { Badge } from '@/components/ui/badge';
@@ -128,6 +128,32 @@ export default function ChatPage() {
               </div>
             </div>
             <div className="flex items-center space-x-4">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={async () => {
+                  try {
+                    const response = await fetch('/api/reset-carol', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ tripId, userId })
+                    });
+                    if (response.ok) {
+                      window.location.reload();
+                    }
+                  } catch (error) {
+                    toast({
+                      title: "Error",
+                      description: "Failed to reset chat",
+                      variant: "destructive"
+                    });
+                  }
+                }}
+                className="text-xs"
+              >
+                <RotateCw className="h-3 w-3 mr-1" />
+                Reset Chat
+              </Button>
               <Badge className={stateDisplay.color}>
                 <Calendar className="w-3 h-3 mr-1" />
                 {stateDisplay.label}

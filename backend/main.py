@@ -409,6 +409,53 @@ async def get_missing_preferences(trip_id: str, db: Session = Depends(get_db)):
     
     return {"missing_preferences": missing_users}
 
+@app.post("/api/reset-carol")
+async def reset_carol(request: dict, db: Session = Depends(get_db)):
+    trip_id = request.get("tripId")
+    user_id = request.get("userId")
+    
+    # Only allow resetting Carol (user_id = 3)
+    if user_id != 3:
+        raise HTTPException(status_code=403, detail="Can only reset Carol's data")
+    
+    # Delete Carol's preferences
+    db.query(UserPreferences).filter(
+        UserPreferences.user_id == user_id,
+        UserPreferences.trip_id == trip_id
+    ).delete()
+    
+    # Delete Carol's availability
+    db.query(DateAvailability).filter(
+        DateAvailability.user_id == user_id,
+        DateAvailability.trip_id == trip_id
+    ).delete()
+    
+    # Delete Carol's messages (keep system message about her joining)
+    db.query(Message).filter(
+        Message.user_id == user_id,
+        Message.trip_id == trip_id
+    ).delete()
+    
+    # Update Carol's participant status
+    participant = db.query(TripParticipant).filter(
+        TripParticipant.user_id == user_id,
+        TripParticipant.trip_id == trip_id
+    ).first()
+    
+    if participant:
+        participant.has_submitted_preferences = False
+        participant.has_submitted_availability = False
+    
+    db.commit()
+    
+    # Broadcast update to all connected clients
+    await manager.broadcast_to_trip(trip_id, {
+        "type": "user_reset",
+        "userId": user_id
+    })
+    
+    return {"success": True}
+
 # Initialize demo data on startup
 @app.on_event("startup")
 async def startup_event():
