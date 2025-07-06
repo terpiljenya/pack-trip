@@ -15,11 +15,11 @@ PackTrip AI is a group travel planning application that facilitates collaborativ
 - **Real-time Communication**: WebSocket integration for live collaboration
 
 ### Backend Architecture
-- **Runtime**: Node.js with Express.js framework
-- **Database**: PostgreSQL with Drizzle ORM
+- **Runtime**: Python 3.11 with FastAPI framework
+- **Database**: PostgreSQL with SQLAlchemy ORM
 - **Database Provider**: Neon Database (serverless PostgreSQL)
-- **Real-time**: WebSocket server for live updates
-- **Session Management**: PostgreSQL session store with connect-pg-simple
+- **Real-time**: WebSocket support via FastAPI WebSockets
+- **Session Management**: To be implemented
 
 ### Project Structure
 ```
@@ -73,11 +73,12 @@ The application uses a PostgreSQL database with the following main entities:
 - **class-variance-authority**: Type-safe CSS class variants
 
 ### Backend Dependencies
-- **drizzle-orm**: Type-safe SQL ORM with PostgreSQL dialect
-- **@neondatabase/serverless**: Serverless PostgreSQL driver
-- **express**: Web application framework
-- **ws**: WebSocket library for real-time communication
-- **connect-pg-simple**: PostgreSQL session store
+- **FastAPI**: Modern, fast web framework for building APIs
+- **SQLAlchemy**: SQL toolkit and ORM for Python
+- **psycopg2-binary**: PostgreSQL adapter for Python
+- **uvicorn**: ASGI server for FastAPI
+- **websockets**: WebSocket implementation for Python
+- **pydantic**: Data validation using Python type annotations
 
 ## Deployment Strategy
 
@@ -98,6 +99,13 @@ The application uses a PostgreSQL database with the following main entities:
 
 ## Changelog
 - July 06, 2025. Initial setup
+- July 06, 2025. Backend rewrite to Python/FastAPI:
+  - Created SQLAlchemy models matching existing Drizzle schema
+  - Implemented FastAPI endpoints with WebSocket support
+  - Set up PostgreSQL database connection with Neon
+  - Fixed SQLAlchemy metadata column name conflicts
+  - Created Pydantic schemas for request/response validation
+  - Backend API ready at port 8000 (requires manual startup)
 
 ## User Preferences
 
