@@ -1006,6 +1006,66 @@ async def reset_carol(request: dict, db: Session = Depends(get_db)):
 
     for msg in initial_messages:
         db.add(msg)
+    
+    # Add Alice and Bob's preferences back
+    alice_prefs = UserPreferences(
+        user_id=1,
+        trip_id=trip_id,
+        budget_preference="medium",
+        accommodation_type="hotel",
+        travel_style="cultural",
+        activities=["sightseeing", "museums", "food tours", "shopping"],
+        dietary_restrictions="Vegetarian",
+        special_requirements="Quiet rooms preferred"
+    )
+    
+    bob_prefs = UserPreferences(
+        user_id=2,
+        trip_id=trip_id,
+        budget_preference="medium",
+        accommodation_type="hotel", 
+        travel_style="adventure",
+        activities=["beach", "outdoor activities", "nightlife", "food tours"],
+        dietary_restrictions=None,
+        special_requirements="Close to nightlife areas"
+    )
+    
+    db.add(alice_prefs)
+    db.add(bob_prefs)
+    
+    # Update Alice and Bob's participant status
+    db.query(TripParticipant).filter(
+        TripParticipant.trip_id == trip_id,
+        TripParticipant.user_id.in_([1, 2])
+    ).update({"has_submitted_preferences": True})
+    
+    # Add Alice and Bob's availability for October dates
+    october_dates = [
+        datetime(2024, 10, 12), datetime(2024, 10, 13), datetime(2024, 10, 14),
+        datetime(2024, 10, 15), datetime(2024, 10, 16), datetime(2024, 10, 17),
+        datetime(2024, 10, 18), datetime(2024, 10, 19), datetime(2024, 10, 20)
+    ]
+    
+    # Alice is available for all dates
+    for date in october_dates:
+        alice_avail = DateAvailability(
+            trip_id=trip_id,
+            user_id=1,
+            date=date,
+            available=True
+        )
+        db.add(alice_avail)
+    
+    # Bob is NOT available on Oct 15-16 (creates conflict)
+    for date in october_dates:
+        bob_avail = DateAvailability(
+            trip_id=trip_id,
+            user_id=2,
+            date=date,
+            available=date not in [datetime(2024, 10, 15), datetime(2024, 10, 16)]
+        )
+        db.add(bob_avail)
+    
     db.commit()
 
     # Broadcast update to all connected clients
