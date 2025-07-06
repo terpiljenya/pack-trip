@@ -487,7 +487,7 @@ async def generate_trip_options(trip_id: str, db: Session = Depends(get_db)):
         trip_id=trip_id,
         user_id=None,
         type="agent",
-        content="Great! I can see everyone has shared their availability. Based on your preferences, I have 3 fantastic itinerary options for Barcelona. Let me know which one excites you most!"
+        content=f"Great! I can see everyone has shared their availability. I found {len(consensus_dates)} dates where everyone is available. Based on your preferences, I have 3 fantastic itinerary options for Barcelona. Let me know which one excites you most!"
     )
     db.add(ai_message)
     

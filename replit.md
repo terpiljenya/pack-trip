@@ -131,6 +131,10 @@ The application uses a PostgreSQL database with the following main entities:
   - Added mock trip options for Barcelona (Cultural, Beach & Nightlife, Balanced)
   - Fixed reset function to properly clean trip state and options
   - Added check to ensure all participants have marked dates before generating
+- July 06, 2025. Fixed trip options display:
+  - Updated AI message to include "3 fantastic itinerary options" text
+  - This triggers the ChatMessage component to render option cards
+  - Options now properly display when consensus is reached
 
 ## User Preferences
 
