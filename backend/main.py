@@ -19,9 +19,7 @@ import openai
 from openai import OpenAI
 
 # Initialize OpenAI client
-openai_client = OpenAI(
-    api_key=os.environ.get("OPENAI_API_KEY")
-)
+openai_client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
 
 # Initialize OpenAI client
 openai_client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
@@ -216,18 +214,16 @@ async def create_vote(trip_id: str,
                       vote: schemas.VoteCreate,
                       db: Session = Depends(get_db)):
     # Check if vote already exists
-    existing_vote = db.query(Vote).filter(
-        Vote.trip_id == trip_id,
-        Vote.user_id == vote.user_id,
-        Vote.option_id == vote.option_id,
-        Vote.emoji == vote.emoji
-    ).first()
+    existing_vote = db.query(Vote).filter(Vote.trip_id == trip_id,
+                                          Vote.user_id == vote.user_id,
+                                          Vote.option_id == vote.option_id,
+                                          Vote.emoji == vote.emoji).first()
 
     if existing_vote:
         # Vote exists, remove it (unvote)
         db.delete(existing_vote)
         db.commit()
-        
+
         # Broadcast vote removal
         await manager.broadcast_to_trip(
             trip_id, {
@@ -240,7 +236,7 @@ async def create_vote(trip_id: str,
                 },
                 "timestamp": datetime.utcnow().isoformat()
             })
-        
+
         return {"action": "removed", "message": "Vote removed"}
     else:
         # Vote doesn't exist, add it
@@ -267,37 +263,39 @@ async def create_vote(trip_id: str,
 async def check_voting_consensus(trip_id: str, db: Session):
     """Check if voting consensus has been reached and generate detailed plan if so."""
     # Get all participants and votes
-    participants = db.query(TripParticipant).filter(TripParticipant.trip_id == trip_id).all()
-    votes = db.query(Vote).filter(Vote.trip_id == trip_id, Vote.emoji == "👍").all()
+    participants = db.query(TripParticipant).filter(
+        TripParticipant.trip_id == trip_id).all()
+    votes = db.query(Vote).filter(Vote.trip_id == trip_id,
+                                  Vote.emoji == "👍").all()
     options = db.query(TripOption).filter(TripOption.trip_id == trip_id).all()
-    
+
     if not participants or not votes or not options:
         return
-    
+
     # Group votes by option
     votes_by_option = {}
     for vote in votes:
         if vote.option_id not in votes_by_option:
             votes_by_option[vote.option_id] = []
         votes_by_option[vote.option_id].append(vote)
-    
+
     # Check if any option has 100% consensus
     total_participants = len(participants)
     winning_option = None
-    
+
     for option_id, option_votes in votes_by_option.items():
         unique_voters = set(vote.user_id for vote in option_votes)
         if len(unique_voters) == total_participants:
-            winning_option = next((opt for opt in options if opt.option_id == option_id), None)
+            winning_option = next(
+                (opt for opt in options if opt.option_id == option_id), None)
             break
-    
+
     if winning_option:
         # Check if detailed plan already exists
         existing_plan = db.query(Message).filter(
             Message.trip_id == trip_id,
-            Message.type == "detailed_plan"
-        ).first()
-        
+            Message.type == "detailed_plan").first()
+
         if not existing_plan:
             # Generate detailed plan
             await generate_detailed_trip_plan(trip_id, winning_option, db)
@@ -306,12 +304,14 @@ async def check_voting_consensus(trip_id: str, db: Session):
 async def check_availability_consensus(trip_id: str, db: Session):
     """Check if availability consensus has been reached and generate trip options if so."""
     # Get all participants and availability
-    participants = db.query(TripParticipant).filter(TripParticipant.trip_id == trip_id).all()
-    availability = db.query(DateAvailability).filter(DateAvailability.trip_id == trip_id).all()
-    
+    participants = db.query(TripParticipant).filter(
+        TripParticipant.trip_id == trip_id).all()
+    availability = db.query(DateAvailability).filter(
+        DateAvailability.trip_id == trip_id).all()
+
     if not participants or not availability:
         return
-    
+
     # Group availability by date
     availability_by_date = {}
     for avail in availability:
@@ -319,163 +319,170 @@ async def check_availability_consensus(trip_id: str, db: Session):
         if date_str not in availability_by_date:
             availability_by_date[date_str] = []
         availability_by_date[date_str].append(avail)
-    
+
     # Find dates where everyone is available
     total_participants = len(participants)
     consensus_dates = []
-    
+
     for date_str, date_availability in availability_by_date.items():
         # Count unique participants who are available on this date
-        available_participants = set(
-            avail.user_id for avail in date_availability if avail.available
-        )
-        
+        available_participants = set(avail.user_id
+                                     for avail in date_availability
+                                     if avail.available)
+
         if len(available_participants) == total_participants:
             consensus_dates.append(date_str)
-    
+
     # Check if we have enough consensus dates (3 or more)
     if len(consensus_dates) >= 3:
-        # Check if trip options already exist
-        existing_options = db.query(TripOption).filter(TripOption.trip_id == trip_id).all()
-        
-        if not existing_options:
-            # Generate trip options
-            await generate_trip_options_internal(trip_id, consensus_dates, db)
+        await generate_trip_options_internal(trip_id, consensus_dates, db)
 
 
-async def generate_trip_options_internal(trip_id: str, consensus_dates: list, db: Session):
+async def generate_trip_options_internal(trip_id: str, consensus_dates: list,
+                                         db: Session):
     """Internal function to generate trip options when consensus is reached."""
     try:
         # Get trip details
         trip = db.query(Trip).filter(Trip.trip_id == trip_id).first()
         if not trip:
             return
-        
+
         # Create trip options
-        options = [
-            {
-                "option_id": "cultural",
-                "type": "itinerary",
-                "title": "Cultural Explorer",
-                "description": "Immerse yourself in art, history, and local traditions with visits to world-class museums, historic neighborhoods, and cultural landmarks.",
-                "price": 1200,
-                "image": "https://images.unsplash.com/photo-1539037116277-4db20889f2d4?w=400&h=300&fit=crop",
-                "meta_data": {
-                    "duration": "3 days",
-                    "highlights": ["Museums", "Historic Sites", "Local Culture"],
-                    "activity_level": "Moderate",
-                    "consensus_dates": consensus_dates
-                }
-            },
-            {
-                "option_id": "beach_nightlife",
-                "type": "itinerary", 
-                "title": "Beach & Nightlife",
-                "description": "Perfect blend of relaxation and excitement with beach days, waterfront dining, and vibrant nightlife experiences.",
-                "price": 1400,
-                "image": "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400&h=300&fit=crop",
-                "meta_data": {
-                    "duration": "3 days",
-                    "highlights": ["Beach Time", "Nightlife", "Coastal Dining"],
-                    "activity_level": "High",
-                    "consensus_dates": consensus_dates
-                }
-            },
-            {
-                "option_id": "balanced",
-                "type": "itinerary",
-                "title": "Balanced Experience", 
-                "description": "The best of both worlds combining cultural discoveries with leisure time, perfect for groups with diverse interests.",
-                "price": 1300,
-                "image": "https://images.unsplash.com/photo-1508672019048-805c876b67e2?w=400&h=300&fit=crop",
-                "meta_data": {
-                    "duration": "3 days",
-                    "highlights": ["Culture", "Food", "Relaxation"],
-                    "activity_level": "Moderate",
-                    "consensus_dates": consensus_dates
-                }
+        options = [{
+            "option_id": "cultural",
+            "type": "itinerary",
+            "title": "Cultural Explorer",
+            "description":
+            "Immerse yourself in art, history, and local traditions with visits to world-class museums, historic neighborhoods, and cultural landmarks.",
+            "price": 1200,
+            "image":
+            "https://images.unsplash.com/photo-1539037116277-4db20889f2d4?w=400&h=300&fit=crop",
+            "meta_data": {
+                "duration": "3 days",
+                "highlights": ["Museums", "Historic Sites", "Local Culture"],
+                "activity_level": "Moderate",
+                "consensus_dates": consensus_dates
             }
-        ]
-        
+        }, {
+            "option_id": "beach_nightlife",
+            "type": "itinerary",
+            "title": "Beach & Nightlife",
+            "description":
+            "Perfect blend of relaxation and excitement with beach days, waterfront dining, and vibrant nightlife experiences.",
+            "price": 1400,
+            "image":
+            "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400&h=300&fit=crop",
+            "meta_data": {
+                "duration": "3 days",
+                "highlights": ["Beach Time", "Nightlife", "Coastal Dining"],
+                "activity_level": "High",
+                "consensus_dates": consensus_dates
+            }
+        }, {
+            "option_id": "balanced",
+            "type": "itinerary",
+            "title": "Balanced Experience",
+            "description":
+            "The best of both worlds combining cultural discoveries with leisure time, perfect for groups with diverse interests.",
+            "price": 1300,
+            "image":
+            "https://images.unsplash.com/photo-1508672019048-805c876b67e2?w=400&h=300&fit=crop",
+            "meta_data": {
+                "duration": "3 days",
+                "highlights": ["Culture", "Food", "Relaxation"],
+                "activity_level": "Moderate",
+                "consensus_dates": consensus_dates
+            }
+        }]
+
         # Save options to database
         for option_data in options:
-            db_option = TripOption(
-                trip_id=trip_id,
-                option_id=option_data["option_id"],
-                type=option_data["type"],
-                title=option_data["title"],
-                description=option_data["description"],
-                price=option_data["price"],
-                image=option_data["image"],
-                meta_data=option_data["meta_data"]
-            )
+            db_option = TripOption(trip_id=trip_id,
+                                   option_id=option_data["option_id"],
+                                   type=option_data["type"],
+                                   title=option_data["title"],
+                                   description=option_data["description"],
+                                   price=option_data["price"],
+                                   image=option_data["image"],
+                                   meta_data=option_data["meta_data"])
             db.add(db_option)
-        
+
         # Create system message about consensus
-        consensus_message = f"🎉 **Consensus Reached!**\n\nGreat news! Everyone is available on {len(consensus_dates)} dates. I've found the perfect overlap in your schedules and generated 3 fantastic itinerary options for your Barcelona trip.\n\n📅 **Available dates for everyone:**\n" + "\n".join(f"• {date}" for date in consensus_dates[:3]) + "\n\nVote for your favorite option below!"
-        
-        db_message = Message(
-            trip_id=trip_id,
-            user_id=None,
-            type="system",
-            content=consensus_message
-        )
+        consensus_message = f"🎉 **Consensus Reached!**\n\nGreat news! Everyone is available on {len(consensus_dates)} dates. I've found the perfect overlap in your schedules and generated 3 fantastic itinerary options for your Barcelona trip.\n\n📅 **Available dates for everyone:**\n" + "\n".join(
+            f"• {date}" for date in
+            consensus_dates[:3]) + "\n\nVote for your favorite option below!"
+
+        db_message = Message(trip_id=trip_id,
+                             user_id=None,
+                             type="system",
+                             content=consensus_message)
         db.add(db_message)
-        
+
         # Update trip state
         trip.state = "VOTING_HIGH_LEVEL"
         db.commit()
-        
+
         # Broadcast the consensus reached event
         await manager.broadcast_to_trip(
             trip_id, {
-                "type": "consensus_reached",
-                "message": schemas.Message.from_orm(db_message).dict(),
-                "options": [schemas.TripOption.from_orm(opt).dict() for opt in db.query(TripOption).filter(TripOption.trip_id == trip_id).all()],
-                "timestamp": datetime.utcnow().isoformat()
+                "type":
+                "consensus_reached",
+                "message":
+                schemas.Message.from_orm(db_message).dict(),
+                "options": [
+                    schemas.TripOption.from_orm(opt).dict()
+                    for opt in db.query(TripOption).filter(
+                        TripOption.trip_id == trip_id).all()
+                ],
+                "timestamp":
+                datetime.utcnow().isoformat()
             })
-        
+
     except Exception as e:
         print(f"Error generating trip options: {e}")
 
 
-async def generate_detailed_trip_plan(trip_id: str, winning_option: TripOption, db: Session):
+async def generate_detailed_trip_plan(trip_id: str, winning_option: TripOption,
+                                      db: Session):
     """Generate detailed trip plan using OpenAI for the winning option."""
     try:
         # Get trip details
         trip = db.query(Trip).filter(Trip.trip_id == trip_id).first()
         if not trip:
             return
-        
+
         # Get user preferences for context
-        preferences = db.query(UserPreferences).filter(UserPreferences.trip_id == trip_id).all()
-        
+        preferences = db.query(UserPreferences).filter(
+            UserPreferences.trip_id == trip_id).all()
+
         # Build context for AI
         context = {
-            "destination": trip.destination or "Barcelona",
-            "title": winning_option.title,
-            "description": winning_option.description,
-            "budget": trip.budget,
-            "preferences": [
-                {
-                    "budget_preference": pref.budget_preference,
-                    "accommodation_type": pref.accommodation_type,
-                    "travel_style": pref.travel_style,
-                    "activities": pref.activities,
-                    "dietary_restrictions": pref.dietary_restrictions
-                }
-                for pref in preferences
-            ]
+            "destination":
+            trip.destination or "Barcelona",
+            "title":
+            winning_option.title,
+            "description":
+            winning_option.description,
+            "budget":
+            trip.budget,
+            "preferences": [{
+                "budget_preference": pref.budget_preference,
+                "accommodation_type": pref.accommodation_type,
+                "travel_style": pref.travel_style,
+                "activities": pref.activities,
+                "dietary_restrictions": pref.dietary_restrictions
+            } for pref in preferences]
         }
-        
+
         # the newest OpenAI model is "gpt-4o" which was released May 13, 2024. do not change this unless explicitly requested by the user
         if openai_client.api_key:
             response = openai_client.chat.completions.create(
                 model="gpt-4o",
-                messages=[
-                    {
-                        "role": "system",
-                        "content": """You are a professional travel planner creating detailed day-by-day itineraries. 
+                messages=[{
+                    "role":
+                    "system",
+                    "content":
+                    """You are a professional travel planner creating detailed day-by-day itineraries. 
                         Create a comprehensive 3-day trip plan with specific restaurants, activities, and timing.
                         Include exact addresses, opening hours, and estimated costs where possible.
                         Format the response as JSON with this structure:
@@ -504,164 +511,168 @@ async def generate_detailed_trip_plan(trip_id: str, winning_option: TripOption, 
                                 "booking_notes": "Book restaurants in advance"
                             }
                         }"""
-                    },
-                    {
-                        "role": "user",
-                        "content": f"""Create a detailed 3-day itinerary for {context['destination']} based on:
+                }, {
+                    "role":
+                    "user",
+                    "content":
+                    f"""Create a detailed 3-day itinerary for {context['destination']} based on:
                         - Theme: {context['title']}
                         - Description: {context['description']}
                         - Budget: {context.get('budget', 'Moderate')}
                         - Preferences: {context['preferences']}
                         
                         Focus on specific, bookable venues and activities with real addresses and timing."""
-                    }
-                ],
+                }],
                 response_format={"type": "json_object"},
-                max_tokens=2000
-            )
-            detailed_plan = json.loads(response.choices[0].message.content or "{}")
+                max_tokens=2000)
+            detailed_plan = json.loads(response.choices[0].message.content
+                                       or "{}")
         else:
             # Mock detailed plan for testing when no API key is available
             detailed_plan = {
-                "title": f"Final Trip Plan: {context['title']}",
-                "summary": f"A comprehensive 3-day {context['title'].lower()} experience in {context['destination']} designed to showcase the best of local culture, cuisine, and attractions.",
-                "days": [
-                    {
-                        "day": 1,
-                        "title": "Day 1: Historic Discovery",
-                        "activities": [
-                            {
-                                "time": "9:00 AM",
-                                "activity": "Gothic Quarter Walking Tour",
-                                "location": "Plaça de la Seu, Barcelona",
-                                "description": "Explore medieval streets, hidden courtyards, and ancient Roman ruins",
-                                "cost": "€15-25",
-                                "duration": "3 hours"
-                            },
-                            {
-                                "time": "1:00 PM",
-                                "activity": "Lunch at Cal Pep",
-                                "location": "Plaça de les Olles, 8, Barcelona",
-                                "description": "Iconic tapas bar with fresh seafood and traditional Catalan dishes",
-                                "cost": "€25-35",
-                                "duration": "1.5 hours"
-                            },
-                            {
-                                "time": "3:30 PM",
-                                "activity": "Picasso Museum",
-                                "location": "Carrer Montcada, 15-23, Barcelona",
-                                "description": "World's most extensive collection of Pablo Picasso's early works",
-                                "cost": "€12",
-                                "duration": "2 hours"
-                            },
-                            {
-                                "time": "8:00 PM",
-                                "activity": "Dinner at Disfrutar",
-                                "location": "Carrer de Villarroel, 163, Barcelona",
-                                "description": "Michelin-starred modern Mediterranean cuisine",
-                                "cost": "€150-200",
-                                "duration": "3 hours"
-                            }
-                        ]
-                    },
-                    {
-                        "day": 2,
-                        "title": "Day 2: Gaudí & Modernism",
-                        "activities": [
-                            {
-                                "time": "9:00 AM",
-                                "activity": "Sagrada Família Tour",
-                                "location": "Carrer de Mallorca, 401, Barcelona",
-                                "description": "Gaudí's masterpiece basilica with tower access",
-                                "cost": "€26-33",
-                                "duration": "2.5 hours"
-                            },
-                            {
-                                "time": "12:00 PM",
-                                "activity": "Park Güell",
-                                "location": "Carrer d'Olot, s/n, Barcelona",
-                                "description": "Gaudí's whimsical park with mosaic art and city views",
-                                "cost": "€10",
-                                "duration": "2 hours"
-                            },
-                            {
-                                "time": "3:00 PM",
-                                "activity": "Casa Batlló",
-                                "location": "Passeig de Gràcia, 43, Barcelona",
-                                "description": "Gaudí's fantastical house with immersive AR experience",
-                                "cost": "€35",
-                                "duration": "1.5 hours"
-                            },
-                            {
-                                "time": "7:00 PM",
-                                "activity": "Cocktails at Paradiso",
-                                "location": "Carrer de Rera Palau, 4, Barcelona",
-                                "description": "Hidden speakeasy behind a pastrami bar",
-                                "cost": "€12-15 per drink",
-                                "duration": "2 hours"
-                            }
-                        ]
-                    },
-                    {
-                        "day": 3,
-                        "title": "Day 3: Beach & Markets",
-                        "activities": [
-                            {
-                                "time": "9:00 AM",
-                                "activity": "La Boquería Market",
-                                "location": "La Rambla, 91, Barcelona",
-                                "description": "Famous food market with fresh produce and local delicacies",
-                                "cost": "€10-15",
-                                "duration": "1.5 hours"
-                            },
-                            {
-                                "time": "11:00 AM",
-                                "activity": "Barceloneta Beach",
-                                "location": "Platja de la Barceloneta, Barcelona",
-                                "description": "Relax on Barcelona's main city beach with chiringuito lunch",
-                                "cost": "€20-30",
-                                "duration": "4 hours"
-                            },
-                            {
-                                "time": "4:00 PM",
-                                "activity": "Cable Car to Montjuïc",
-                                "location": "Av. Miramar, 30, Barcelona",
-                                "description": "Scenic cable car ride with panoramic city views",
-                                "cost": "€13",
-                                "duration": "1 hour"
-                            },
-                            {
-                                "time": "7:30 PM",
-                                "activity": "Sunset at Bunkers del Carmel",
-                                "location": "Carrer de Marià Labèrnia, s/n, Barcelona",
-                                "description": "Best sunset views in Barcelona from former anti-aircraft bunkers",
-                                "cost": "Free",
-                                "duration": "2 hours"
-                            }
-                        ]
-                    }
-                ],
+                "title":
+                f"Final Trip Plan: {context['title']}",
+                "summary":
+                f"A comprehensive 3-day {context['title'].lower()} experience in {context['destination']} designed to showcase the best of local culture, cuisine, and attractions.",
+                "days": [{
+                    "day":
+                    1,
+                    "title":
+                    "Day 1: Historic Discovery",
+                    "activities": [{
+                        "time": "9:00 AM",
+                        "activity": "Gothic Quarter Walking Tour",
+                        "location": "Plaça de la Seu, Barcelona",
+                        "description":
+                        "Explore medieval streets, hidden courtyards, and ancient Roman ruins",
+                        "cost": "€15-25",
+                        "duration": "3 hours"
+                    }, {
+                        "time": "1:00 PM",
+                        "activity": "Lunch at Cal Pep",
+                        "location": "Plaça de les Olles, 8, Barcelona",
+                        "description":
+                        "Iconic tapas bar with fresh seafood and traditional Catalan dishes",
+                        "cost": "€25-35",
+                        "duration": "1.5 hours"
+                    }, {
+                        "time": "3:30 PM",
+                        "activity": "Picasso Museum",
+                        "location": "Carrer Montcada, 15-23, Barcelona",
+                        "description":
+                        "World's most extensive collection of Pablo Picasso's early works",
+                        "cost": "€12",
+                        "duration": "2 hours"
+                    }, {
+                        "time": "8:00 PM",
+                        "activity": "Dinner at Disfrutar",
+                        "location": "Carrer de Villarroel, 163, Barcelona",
+                        "description":
+                        "Michelin-starred modern Mediterranean cuisine",
+                        "cost": "€150-200",
+                        "duration": "3 hours"
+                    }]
+                }, {
+                    "day":
+                    2,
+                    "title":
+                    "Day 2: Gaudí & Modernism",
+                    "activities": [{
+                        "time": "9:00 AM",
+                        "activity": "Sagrada Família Tour",
+                        "location": "Carrer de Mallorca, 401, Barcelona",
+                        "description":
+                        "Gaudí's masterpiece basilica with tower access",
+                        "cost": "€26-33",
+                        "duration": "2.5 hours"
+                    }, {
+                        "time": "12:00 PM",
+                        "activity": "Park Güell",
+                        "location": "Carrer d'Olot, s/n, Barcelona",
+                        "description":
+                        "Gaudí's whimsical park with mosaic art and city views",
+                        "cost": "€10",
+                        "duration": "2 hours"
+                    }, {
+                        "time": "3:00 PM",
+                        "activity": "Casa Batlló",
+                        "location": "Passeig de Gràcia, 43, Barcelona",
+                        "description":
+                        "Gaudí's fantastical house with immersive AR experience",
+                        "cost": "€35",
+                        "duration": "1.5 hours"
+                    }, {
+                        "time": "7:00 PM",
+                        "activity": "Cocktails at Paradiso",
+                        "location": "Carrer de Rera Palau, 4, Barcelona",
+                        "description":
+                        "Hidden speakeasy behind a pastrami bar",
+                        "cost": "€12-15 per drink",
+                        "duration": "2 hours"
+                    }]
+                }, {
+                    "day":
+                    3,
+                    "title":
+                    "Day 3: Beach & Markets",
+                    "activities": [{
+                        "time": "9:00 AM",
+                        "activity": "La Boquería Market",
+                        "location": "La Rambla, 91, Barcelona",
+                        "description":
+                        "Famous food market with fresh produce and local delicacies",
+                        "cost": "€10-15",
+                        "duration": "1.5 hours"
+                    }, {
+                        "time": "11:00 AM",
+                        "activity": "Barceloneta Beach",
+                        "location": "Platja de la Barceloneta, Barcelona",
+                        "description":
+                        "Relax on Barcelona's main city beach with chiringuito lunch",
+                        "cost": "€20-30",
+                        "duration": "4 hours"
+                    }, {
+                        "time": "4:00 PM",
+                        "activity": "Cable Car to Montjuïc",
+                        "location": "Av. Miramar, 30, Barcelona",
+                        "description":
+                        "Scenic cable car ride with panoramic city views",
+                        "cost": "€13",
+                        "duration": "1 hour"
+                    }, {
+                        "time": "7:30 PM",
+                        "activity": "Sunset at Bunkers del Carmel",
+                        "location": "Carrer de Marià Labèrnia, s/n, Barcelona",
+                        "description":
+                        "Best sunset views in Barcelona from former anti-aircraft bunkers",
+                        "cost": "Free",
+                        "duration": "2 hours"
+                    }]
+                }],
                 "practical_info": {
-                    "total_estimated_cost": "€400-600 per person",
-                    "transportation": "Metro day passes (€10.20), walking, occasional taxi",
-                    "booking_notes": "Reserve Disfrutar 2-3 months ahead. Buy Sagrada Família tickets online. Book Casa Batlló skip-the-line tickets."
+                    "total_estimated_cost":
+                    "€400-600 per person",
+                    "transportation":
+                    "Metro day passes (€10.20), walking, occasional taxi",
+                    "booking_notes":
+                    "Reserve Disfrutar 2-3 months ahead. Buy Sagrada Família tickets online. Book Casa Batlló skip-the-line tickets."
                 }
             }
-        
+
         # Save as message
         db_message = Message(
             trip_id=trip_id,
             user_id=None,  # System message
             type="detailed_plan",
-            content=f"🎉 **{detailed_plan['title']}**\n\n{detailed_plan['summary']}",
-            meta_data=detailed_plan
-        )
+            content=
+            f"🎉 **{detailed_plan['title']}**\n\n{detailed_plan['summary']}",
+            meta_data=detailed_plan)
         db.add(db_message)
-        
+
         # Update trip state
         trip.state = "DETAILED_PLAN_READY"
         db.commit()
-        
+
         # Broadcast the new plan
         await manager.broadcast_to_trip(
             trip_id, {
@@ -669,7 +680,7 @@ async def generate_detailed_trip_plan(trip_id: str, winning_option: TripOption, 
                 "message": schemas.Message.from_orm(db_message).dict(),
                 "timestamp": datetime.utcnow().isoformat()
             })
-        
+
     except Exception as e:
         print(f"Error generating detailed plan: {e}")
 
@@ -803,7 +814,7 @@ async def set_preferences(
         "type": "new_message",
         "timestamp": datetime.utcnow().isoformat()
     })
-    
+
     # Since we start with COLLECTING_DATES, we don't need state transitions here
     # Just provide helpful guidance after preferences are submitted
 
@@ -1019,19 +1030,22 @@ async def reset_carol(request: dict, db: Session = Depends(get_db)):
 
     # Delete ALL messages for this trip to reset chat completely
     db.query(Message).filter(Message.trip_id == trip_id).delete()
-    
+
     # Delete ALL votes for this trip
     db.query(Vote).filter(Vote.trip_id == trip_id).delete()
 
     # Reset ALL participants' status
     db.query(TripParticipant).filter(
         TripParticipant.trip_id == trip_id).update({
-            "has_submitted_preferences": False,
-            "has_submitted_availability": False
+            "has_submitted_preferences":
+            False,
+            "has_submitted_availability":
+            False
         })
 
     # Reset trip state to COLLECTING_DATES (initial state)
-    db.query(Trip).filter(Trip.trip_id == trip_id).update({"state": "COLLECTING_DATES"})
+    db.query(Trip).filter(Trip.trip_id == trip_id).update(
+        {"state": "COLLECTING_DATES"})
 
     # Delete all trip options
     db.query(TripOption).filter(TripOption.trip_id == trip_id).delete()
@@ -1114,7 +1128,7 @@ async def reset_carol(request: dict, db: Session = Depends(get_db)):
 
     for msg in initial_messages:
         db.add(msg)
-    
+
     # Add Alice and Bob's preferences back
     alice_prefs = UserPreferences(
         user_id=1,
@@ -1124,56 +1138,58 @@ async def reset_carol(request: dict, db: Session = Depends(get_db)):
         travel_style="cultural",
         activities=["sightseeing", "museums", "food tours", "shopping"],
         dietary_restrictions="Vegetarian",
-        special_requirements="Quiet rooms preferred"
-    )
-    
+        special_requirements="Quiet rooms preferred")
+
     bob_prefs = UserPreferences(
         user_id=2,
         trip_id=trip_id,
         budget_preference="medium",
-        accommodation_type="hotel", 
+        accommodation_type="hotel",
         travel_style="adventure",
         activities=["beach", "outdoor activities", "nightlife", "food tours"],
         dietary_restrictions=None,
-        special_requirements="Close to nightlife areas"
-    )
-    
+        special_requirements="Close to nightlife areas")
+
     db.add(alice_prefs)
     db.add(bob_prefs)
-    
+
     # Update Alice and Bob's participant status
     db.query(TripParticipant).filter(
-        TripParticipant.trip_id == trip_id,
-        TripParticipant.user_id.in_([1, 2])
-    ).update({"has_submitted_preferences": True})
-    
+        TripParticipant.trip_id == trip_id, TripParticipant.user_id.in_(
+            [1, 2])).update({"has_submitted_preferences": True})
+
     # Add Alice and Bob's availability for October dates
     october_dates = [
-        datetime(2024, 10, 12), datetime(2024, 10, 13), datetime(2024, 10, 14),
-        datetime(2024, 10, 15), datetime(2024, 10, 16), datetime(2024, 10, 17),
-        datetime(2024, 10, 18), datetime(2024, 10, 19), datetime(2024, 10, 20)
+        datetime(2024, 10, 12),
+        datetime(2024, 10, 13),
+        datetime(2024, 10, 14),
+        datetime(2024, 10, 15),
+        datetime(2024, 10, 16),
+        datetime(2024, 10, 17),
+        datetime(2024, 10, 18),
+        datetime(2024, 10, 19),
+        datetime(2024, 10, 20)
     ]
-    
+
     # Alice is available for all dates
     for date in october_dates:
-        alice_avail = DateAvailability(
-            trip_id=trip_id,
-            user_id=1,
-            date=date,
-            available=True
-        )
+        alice_avail = DateAvailability(trip_id=trip_id,
+                                       user_id=1,
+                                       date=date,
+                                       available=True)
         db.add(alice_avail)
-    
+
     # Bob is NOT available on Oct 15-16 (creates conflict)
     for date in october_dates:
-        bob_avail = DateAvailability(
-            trip_id=trip_id,
-            user_id=2,
-            date=date,
-            available=date not in [datetime(2024, 10, 15), datetime(2024, 10, 16)]
-        )
+        bob_avail = DateAvailability(trip_id=trip_id,
+                                     user_id=2,
+                                     date=date,
+                                     available=date not in [
+                                         datetime(2024, 10, 15),
+                                         datetime(2024, 10, 16)
+                                     ])
         db.add(bob_avail)
-    
+
     db.commit()
 
     # Broadcast update to all connected clients
