@@ -665,39 +665,8 @@ async def set_preferences(
         "timestamp": datetime.utcnow().isoformat()
     })
     
-    # Check if all participants have submitted preferences
-    trip = db.query(Trip).filter(Trip.trip_id == trip_id).first()
-    all_participants = db.query(TripParticipant).filter(
-        TripParticipant.trip_id == trip_id).all()
-    participants_with_prefs = db.query(TripParticipant).filter(
-        TripParticipant.trip_id == trip_id,
-        TripParticipant.has_submitted_preferences == True).count()
-    
-    # If all participants have submitted preferences and we're in INIT state, move to COLLECTING_DATES
-    if trip and trip.state == "INIT" and participants_with_prefs == len(all_participants):
-        trip.state = "COLLECTING_DATES"
-        
-        # Add the date collection message
-        date_message = Message(
-            trip_id=trip_id,
-            user_id=None,
-            type="agent",
-            content="Perfect! I now have everyone's preferences. Let's coordinate your dates - I need everyone to mark their availability on the calendar below. Click on the dates you're available to travel!"
-        )
-        db.add(date_message)
-        db.commit()
-        
-        # Broadcast state change and new message
-        await manager.broadcast_to_trip(trip_id, {
-            "type": "state_changed",
-            "state": "COLLECTING_DATES",
-            "timestamp": datetime.utcnow().isoformat()
-        })
-        
-        await manager.broadcast_to_trip(trip_id, {
-            "type": "new_message",
-            "timestamp": datetime.utcnow().isoformat()
-        })
+    # Since we start with COLLECTING_DATES, we don't need state transitions here
+    # Just provide helpful guidance after preferences are submitted
 
     if existing:
         return existing
@@ -922,8 +891,8 @@ async def reset_carol(request: dict, db: Session = Depends(get_db)):
             "has_submitted_availability": False
         })
 
-    # Reset trip state to INIT (initial state)
-    db.query(Trip).filter(Trip.trip_id == trip_id).update({"state": "INIT"})
+    # Reset trip state to COLLECTING_DATES (initial state)
+    db.query(Trip).filter(Trip.trip_id == trip_id).update({"state": "COLLECTING_DATES"})
 
     # Delete all trip options
     db.query(TripOption).filter(TripOption.trip_id == trip_id).delete()

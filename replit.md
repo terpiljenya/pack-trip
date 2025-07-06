@@ -148,6 +148,13 @@ The application uses a PostgreSQL database with the following main entities:
   - Fixed consensus calculation to count unique voters with thumbs up
   - Updated consensus display to show "Full consensus reached!" at 100%
   - Added sample votes from all users for UI testing purposes
+- July 06, 2025. Simplified state flow and added roadmap:
+  - Removed INIT state, trips now start directly with COLLECTING_DATES
+  - Added comprehensive trip planning roadmap in ContextDrawer
+  - Shows completed and upcoming steps with visual indicators
+  - Made roadmap the default active tab
+  - Fixed reset to include Alice and Bob's preferences and availability
+  - Updated TripState type to include DETAILED_PLAN_READY state
 
 ## Next Steps Plan
 

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Calendar, Route, MapPin, Users, DollarSign, Share2, CalendarPlus } from 'lucide-react';
+import { Calendar, Route, MapPin, Users, DollarSign, Share2, CalendarPlus, CheckCircle2, Circle, ListChecks } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
@@ -14,13 +14,71 @@ interface ContextDrawerProps {
   userId: number;
 }
 
+interface RoadmapStep {
+  title: string;
+  description: string;
+  completed: boolean;
+  current: boolean;
+}
+
+function getRoadmapSteps(tripContext: TripContext): RoadmapStep[] {
+  const state = tripContext.state;
+  // Check for preferences by looking at messages that indicate preference submission
+  const hasPreferences = tripContext.messages.some(m => 
+    m.type === 'system' && m.content.includes('has shared their preferences')
+  );
+  const hasAvailability = tripContext.availability.length > 0;
+  const hasOptions = tripContext.options.length > 0;
+  const hasVotes = tripContext.votes.length > 0;
+  const hasDetailedPlan = state === 'DETAILED_PLAN_READY';
+  
+  return [
+    {
+      title: "Share Travel Preferences",
+      description: "Each traveler shares their budget, travel style, and interests",
+      completed: hasPreferences || state !== 'COLLECTING_DATES',
+      current: state === 'COLLECTING_DATES' && !hasPreferences
+    },
+    {
+      title: "Select Available Dates",
+      description: "Mark dates when everyone can travel on the calendar",
+      completed: hasAvailability,
+      current: state === 'COLLECTING_DATES' && hasPreferences && !hasAvailability
+    },
+    {
+      title: "Review Trip Options",
+      description: "AI generates personalized trip options based on preferences",
+      completed: hasOptions,
+      current: state === 'VOTING_HIGH_LEVEL' && !hasOptions
+    },
+    {
+      title: "Vote on Favorite Option",
+      description: "Team votes on their preferred trip option",
+      completed: hasVotes && hasDetailedPlan,
+      current: state === 'VOTING_HIGH_LEVEL' && hasVotes && !hasDetailedPlan
+    },
+    {
+      title: "Get Detailed Itinerary",
+      description: "AI creates a detailed day-by-day plan for the chosen option",
+      completed: hasDetailedPlan,
+      current: state === 'DETAILED_PLAN_READY'
+    },
+    {
+      title: "Book Your Trip",
+      description: "Review final details and proceed to booking",
+      completed: false,
+      current: false
+    }
+  ];
+}
+
 export default function ContextDrawer({ 
   tripContext, 
   onVote, 
   onSetAvailability, 
   userId 
 }: ContextDrawerProps) {
-  const [activeTab, setActiveTab] = useState('calendar');
+  const [activeTab, setActiveTab] = useState('roadmap');
 
   const onlineParticipants = tripContext.participants.filter(p => p.isOnline);
   const offlineParticipants = tripContext.participants.filter(p => !p.isOnline);
@@ -41,24 +99,31 @@ export default function ContextDrawer({
         </div>
         
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid w-full grid-cols-3 bg-slate-100 p-1 rounded-lg">
+          <TabsList className="grid w-full grid-cols-4 bg-slate-100 p-1 rounded-lg">
+            <TabsTrigger 
+              value="roadmap" 
+              className="flex items-center text-xs py-2 px-2 data-[state=active]:bg-white data-[state=active]:shadow-sm"
+            >
+              <ListChecks className="w-3 h-3 mr-1" />
+              Roadmap
+            </TabsTrigger>
             <TabsTrigger 
               value="calendar" 
-              className="flex items-center text-xs py-2 px-3 data-[state=active]:bg-white data-[state=active]:shadow-sm"
+              className="flex items-center text-xs py-2 px-2 data-[state=active]:bg-white data-[state=active]:shadow-sm"
             >
               <Calendar className="w-3 h-3 mr-1" />
               Calendar
             </TabsTrigger>
             <TabsTrigger 
               value="itinerary" 
-              className="flex items-center text-xs py-2 px-3 data-[state=active]:bg-white data-[state=active]:shadow-sm"
+              className="flex items-center text-xs py-2 px-2 data-[state=active]:bg-white data-[state=active]:shadow-sm"
             >
               <Route className="w-3 h-3 mr-1" />
               Itinerary
             </TabsTrigger>
             <TabsTrigger 
               value="map" 
-              className="flex items-center text-xs py-2 px-3 data-[state=active]:bg-white data-[state=active]:shadow-sm"
+              className="flex items-center text-xs py-2 px-2 data-[state=active]:bg-white data-[state=active]:shadow-sm"
             >
               <MapPin className="w-3 h-3 mr-1" />
               Map
@@ -70,6 +135,37 @@ export default function ContextDrawer({
       {/* Content */}
       <div className="flex-1 overflow-y-auto p-4">
         <Tabs value={activeTab} className="w-full">
+          <TabsContent value="roadmap" className="space-y-4 mt-0">
+            <Card>
+              <CardContent className="p-4">
+                <h3 className="font-semibold text-slate-900 mb-4">Trip Planning Progress</h3>
+                <div className="space-y-3">
+                  {getRoadmapSteps(tripContext).map((step: RoadmapStep, index: number) => (
+                    <div key={index} className="flex items-start space-x-3">
+                      {step.completed ? (
+                        <CheckCircle2 className="w-5 h-5 text-green-600 mt-0.5" />
+                      ) : (
+                        <Circle className="w-5 h-5 text-slate-300 mt-0.5" />
+                      )}
+                      <div className="flex-1">
+                        <div className="flex items-center justify-between">
+                          <h4 className={`text-sm font-medium ${step.completed ? 'text-slate-900' : 'text-slate-500'}`}>
+                            {step.title}
+                          </h4>
+                          {step.current && (
+                            <Badge variant="secondary" className="text-xs">Current</Badge>
+                          )}
+                        </div>
+                        <p className={`text-xs mt-1 ${step.completed ? 'text-slate-600' : 'text-slate-400'}`}>
+                          {step.description}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
           <TabsContent value="calendar" className="space-y-4 mt-0">
             {/* Selected Dates */}
             <Card>
