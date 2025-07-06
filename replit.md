@@ -135,6 +135,8 @@ The application uses a PostgreSQL database with the following main entities:
   - Updated AI message to include "3 fantastic itinerary options" text
   - This triggers the ChatMessage component to render option cards
   - Options now properly display when consensus is reached
+  - Fixed data transformation in useTripState hook to map snake_case to camelCase
+  - Options now properly map option_id -> optionId and meta_data -> metadata
 
 ## User Preferences
 

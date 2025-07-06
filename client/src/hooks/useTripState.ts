@@ -207,7 +207,16 @@ export function useTripState(tripId: string, userId: number) {
       timestamp: new Date(m.timestamp),
       metadata: m.meta_data
     })),
-    options,
+    options: options.map((o: any) => ({
+      id: o.id,
+      optionId: o.option_id,
+      type: o.type,
+      title: o.title,
+      description: o.description,
+      price: o.price,
+      image: o.image,
+      metadata: o.meta_data
+    })),
     votes: votes.map((v: any) => ({
       ...v,
       timestamp: new Date(v.timestamp)

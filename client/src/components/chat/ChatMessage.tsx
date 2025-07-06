@@ -120,16 +120,20 @@ export default function ChatMessage({
             
             {showOptions && (
               <div className="space-y-4">
-                {options.filter(opt => opt.type === 'itinerary').map((option) => (
-                  <ItineraryCard
-                    key={option.id}
-                    option={option}
-                    votes={votes.filter(v => v.optionId === option.optionId)}
-                    participants={participants}
-                    onVote={onVote}
-                    userId={userId}
-                  />
-                ))}
+                {options.filter(opt => opt.type === 'itinerary').length > 0 ? (
+                  options.filter(opt => opt.type === 'itinerary').map((option) => (
+                    <ItineraryCard
+                      key={option.id}
+                      option={option}
+                      votes={votes.filter(v => v.optionId === option.optionId)}
+                      participants={participants}
+                      onVote={onVote}
+                      userId={userId}
+                    />
+                  ))
+                ) : (
+                  <div className="text-sm text-slate-500">Loading options...</div>
+                )}
               </div>
             )}
             
