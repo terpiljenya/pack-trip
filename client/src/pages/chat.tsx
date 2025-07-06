@@ -1,58 +1,75 @@
-import { useParams } from 'wouter';
-import { useTripState } from '@/hooks/useTripState';
-import { useIsMobile } from '@/hooks/use-mobile';
-import { useState, useEffect } from 'react';
-import { Plane, Users, Calendar, MapPin, Menu, X, RotateCw } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
-import { Badge } from '@/components/ui/badge';
-import ChatMessage from '@/components/chat/ChatMessage';
-import MessageInput from '@/components/chat/MessageInput';
-import ContextDrawer from '@/components/chat/ContextDrawer';
-import PreferencesDialog from '@/components/chat/PreferencesDialog';
-import { useToast } from '@/hooks/use-toast';
+import { useParams } from "wouter";
+import { useTripState } from "@/hooks/useTripState";
+import { useIsMobile } from "@/hooks/use-mobile";
+import { useState, useEffect } from "react";
+import {
+  Plane,
+  Users,
+  Calendar,
+  MapPin,
+  Menu,
+  X,
+  RotateCw,
+} from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
+import { Badge } from "@/components/ui/badge";
+import ChatMessage from "@/components/chat/ChatMessage";
+import MessageInput from "@/components/chat/MessageInput";
+import ContextDrawer from "@/components/chat/ContextDrawer";
+import PreferencesDialog from "@/components/chat/PreferencesDialog";
+import { useToast } from "@/hooks/use-toast";
 
 export default function ChatPage() {
   const params = useParams();
-  const tripId = params.tripId || 'BCN-2024-001';
+  const tripId = params.tripId || "BCN-2024-001";
   const userId = 3; // Simulating Carol as the new user
   const isMobile = useIsMobile();
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [showPreferencesDialog, setShowPreferencesDialog] = useState(false);
   const { toast } = useToast();
-  
-  const { 
-    tripContext, 
-    sendMessage, 
-    vote, 
-    setAvailability, 
+
+  const {
+    tripContext,
+    sendMessage,
+    vote,
+    setAvailability,
     setPreferences,
     preferences,
     missingPreferences,
-    isConnected 
+    isConnected,
   } = useTripState(tripId, userId);
 
   const getStateDisplay = (state: string) => {
     switch (state) {
-      case 'COLLECTING_DATES':
-        return { label: 'Collecting Dates', color: 'bg-orange-100 text-orange-800' };
-      case 'VOTING_HIGH_LEVEL':
-        return { label: 'Voting on Options', color: 'bg-blue-100 text-blue-800' };
-      case 'ITINERARY_LOCKED':
-        return { label: 'Itinerary Locked', color: 'bg-green-100 text-green-800' };
+      case "COLLECTING_DATES":
+        return {
+          label: "Collecting Dates",
+          color: "bg-orange-100 text-orange-800",
+        };
+      case "VOTING_HIGH_LEVEL":
+        return {
+          label: "Voting on Options",
+          color: "bg-blue-100 text-blue-800",
+        };
+      case "ITINERARY_LOCKED":
+        return {
+          label: "Itinerary Locked",
+          color: "bg-green-100 text-green-800",
+        };
       default:
-        return { label: 'Planning', color: 'bg-gray-100 text-gray-800' };
+        return { label: "Planning", color: "bg-gray-100 text-gray-800" };
     }
   };
 
   const stateDisplay = getStateDisplay(tripContext.state);
-  const onlineParticipants = tripContext.participants.filter(p => p.isOnline);
+  const onlineParticipants = tripContext.participants.filter((p) => p.isOnline);
 
   // Check if current user needs to submit preferences
   useEffect(() => {
     if (missingPreferences?.missing_preferences) {
       const userNeedsPreferences = missingPreferences.missing_preferences.some(
-        (user: any) => user.user_id === userId
+        (user: any) => user.user_id === userId,
       );
       if (userNeedsPreferences && !preferences) {
         setShowPreferencesDialog(true);
@@ -76,8 +93,8 @@ export default function ChatPage() {
     }
   };
 
-  const currentUser = tripContext.participants.find(p => p.userId === userId);
-  const userName = currentUser?.displayName || 'Traveler';
+  const currentUser = tripContext.participants.find((p) => p.userId === userId);
+  const userName = currentUser?.displayName || "Traveler";
 
   return (
     <div className="h-screen flex flex-col lg:flex-row bg-slate-50">
@@ -89,7 +106,9 @@ export default function ChatPage() {
               <Plane className="w-5 h-5 text-white" />
             </div>
             <div>
-              <h1 className="text-lg font-semibold text-slate-900">PackTrip AI</h1>
+              <h1 className="text-lg font-semibold text-slate-900">
+                PackTrip AI
+              </h1>
               <p className="text-xs text-slate-500">Barcelona Trip Planning</p>
             </div>
           </div>
@@ -100,7 +119,7 @@ export default function ChatPage() {
               </Button>
             </SheetTrigger>
             <SheetContent side="right" className="w-full max-w-md p-0">
-              <ContextDrawer 
+              <ContextDrawer
                 tripContext={tripContext}
                 onVote={vote}
                 onSetAvailability={setAvailability}
@@ -121,9 +140,12 @@ export default function ChatPage() {
                 <Plane className="w-6 h-6 text-white" />
               </div>
               <div>
-                <h1 className="text-xl font-semibold text-slate-900">PackTrip AI</h1>
+                <h1 className="text-xl font-semibold text-slate-900">
+                  PackTrip AI
+                </h1>
                 <p className="text-sm text-slate-500">
-                  Barcelona Trip Planning • {tripContext.participants.length} travelers
+                  Barcelona Trip Planning • {tripContext.participants.length}{" "}
+                  travelers
                 </p>
               </div>
             </div>
@@ -133,10 +155,10 @@ export default function ChatPage() {
                 size="sm"
                 onClick={async () => {
                   try {
-                    const response = await fetch('/api/reset-carol', {
-                      method: 'POST',
-                      headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify({ tripId, userId })
+                    const response = await fetch("/api/reset-carol", {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({ tripId, userId }),
                     });
                     if (response.ok) {
                       window.location.reload();
@@ -145,7 +167,7 @@ export default function ChatPage() {
                     toast({
                       title: "Error",
                       description: "Failed to reset chat",
-                      variant: "destructive"
+                      variant: "destructive",
                     });
                   }
                 }}
@@ -190,9 +212,11 @@ export default function ChatPage() {
               />
             ))
           ) : (
-            <div className="text-center text-gray-500">Loading participants...</div>
+            <div className="text-center text-gray-500">
+              Loading participants...
+            </div>
           )}
-          
+
           {!isConnected && (
             <div className="text-center py-4">
               <div className="inline-flex items-center px-3 py-1 bg-orange-100 text-orange-800 rounded-full text-sm">
@@ -210,7 +234,7 @@ export default function ChatPage() {
       {/* Desktop Context Drawer */}
       {!isMobile && (
         <div className="lg:w-3/10 bg-white border-l border-slate-200">
-          <ContextDrawer 
+          <ContextDrawer
             tripContext={tripContext}
             onVote={vote}
             onSetAvailability={setAvailability}
@@ -220,12 +244,12 @@ export default function ChatPage() {
       )}
 
       {/* Preferences Dialog */}
-      <PreferencesDialog
+      {/* <PreferencesDialog
         open={showPreferencesDialog}
         onOpenChange={setShowPreferencesDialog}
         onSubmit={handlePreferencesSubmit}
         userName={userName}
-      />
+      /> */}
     </div>
   );
 }
