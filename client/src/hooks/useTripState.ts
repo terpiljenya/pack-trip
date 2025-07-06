@@ -179,6 +179,11 @@ export function useTripState(tripId: string, userId: number) {
           queryClient.invalidateQueries({ queryKey: [`/api/trips/${tripId}/missing-preferences`] });
           queryClient.invalidateQueries({ queryKey: [`/api/trips/${tripId}/participants`] });
           break;
+        case 'options_generated':
+          queryClient.invalidateQueries({ queryKey: [`/api/trips/${tripId}/options`] });
+          queryClient.invalidateQueries({ queryKey: [`/api/trips/${tripId}/messages`] });
+          queryClient.invalidateQueries({ queryKey: [`/api/trips/${tripId}`] });
+          break;
       }
     });
   }, [wsMessages, queryClient, tripId]);

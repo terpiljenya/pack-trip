@@ -123,6 +123,12 @@ The application uses a PostgreSQL database with the following main entities:
   - Fixed timezone issues causing wrong date selection (now using UTC noon)
   - Added optimistic updates for immediate UI feedback on date clicks
   - Improved date comparison logic to handle timezone differences properly
+- July 06, 2025. Implemented consensus-based trip planning:
+  - Removed automatic trip planning on every calendar click
+  - Created `/api/trips/{trip_id}/generate-options` endpoint for trip planning
+  - Added frontend logic to detect consensus (3+ dates where everyone is available)
+  - Trip options are generated only once when consensus is reached
+  - Added mock trip options for Barcelona (Cultural, Beach & Nightlife, Balanced)
 
 ## User Preferences
 

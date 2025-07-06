@@ -19,6 +19,7 @@ import MessageInput from "@/components/chat/MessageInput";
 import ContextDrawer from "@/components/chat/ContextDrawer";
 import PreferencesDialog from "@/components/chat/PreferencesDialog";
 import { useToast } from "@/hooks/use-toast";
+import { apiRequest } from "@/lib/queryClient";
 
 export default function ChatPage() {
   const params = useParams();
@@ -76,6 +77,52 @@ export default function ChatPage() {
       }
     }
   }, [missingPreferences, preferences, userId]);
+
+  // Check for consensus and trigger trip planning
+  useEffect(() => {
+    if (!tripContext || tripContext.state !== 'COLLECTING_DATES') return;
+    
+    // Count dates where everyone is available
+    const dateAvailability: { [key: string]: Set<number> } = {};
+    
+    tripContext.availability.forEach(avail => {
+      if (avail.available) {
+        const dateKey = avail.date.toDateString();
+        if (!dateAvailability[dateKey]) {
+          dateAvailability[dateKey] = new Set();
+        }
+        dateAvailability[dateKey].add(avail.userId);
+      }
+    });
+    
+    // Find dates where everyone is available
+    const totalParticipants = tripContext.participants.length;
+    const consensusDates = Object.entries(dateAvailability)
+      .filter(([_, users]) => users.size === totalParticipants)
+      .map(([date]) => date);
+    
+    // If we have at least 3 consensus dates and haven't generated options yet
+    if (consensusDates.length >= 3 && tripContext.options.length === 0) {
+      // Small delay to ensure all participants have marked their dates
+      const timer = setTimeout(async () => {
+        try {
+          const response = await apiRequest('POST', `/api/trips/${tripId}/generate-options`);
+          const data = await response.json();
+          
+          if (data.success) {
+            toast({
+              title: "Trip options generated!",
+              description: `Found ${data.consensus_dates.length} dates where everyone is available.`,
+            });
+          }
+        } catch (error) {
+          console.error('Failed to generate options:', error);
+        }
+      }, 2000);
+      
+      return () => clearTimeout(timer);
+    }
+  }, [tripContext, tripId, toast]);
 
   const handlePreferencesSubmit = async (data: any) => {
     try {
