@@ -34,7 +34,6 @@ class ConnectionManager:
         self.active_connections: Dict[str, Set[WebSocket]] = {}
     
     async def connect(self, websocket: WebSocket, trip_id: str):
-        await websocket.accept()
         if trip_id not in self.active_connections:
             self.active_connections[trip_id] = set()
         self.active_connections[trip_id].add(websocket)
