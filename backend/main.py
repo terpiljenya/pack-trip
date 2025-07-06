@@ -1,10 +1,14 @@
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Depends, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse, Response
 from sqlalchemy.orm import Session
 from typing import Dict, Set
 import json
 import asyncio
 from datetime import datetime
+import os
+from pathlib import Path
 
 from .database import get_db, engine
 from .models import Base, User, Trip, TripParticipant, Message, Vote, TripOption, DateAvailability
@@ -406,6 +410,42 @@ async def startup_event():
     for option in options:
         db.add(option)
     db.commit()
+
+# In development mode, proxy to Vite dev server
+if os.getenv("NODE_ENV") == "development":
+    from fastapi import Request
+    import httpx
+    
+    @app.api_route("/{path:path}", methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS", "HEAD"])
+    async def proxy_to_vite(request: Request, path: str):
+        # Skip API and WebSocket routes
+        if path.startswith("api/") or path == "ws":
+            raise HTTPException(status_code=404, detail="Not found")
+        
+        # Proxy to Vite dev server
+        async with httpx.AsyncClient() as client:
+            url = f"http://localhost:5173/{path}"
+            headers = dict(request.headers)
+            headers.pop("host", None)
+            
+            response = await client.request(
+                method=request.method,
+                url=url,
+                headers=headers,
+                params=request.query_params,
+                content=await request.body() if request.method in ["POST", "PUT", "PATCH"] else None
+            )
+            
+            return Response(
+                content=response.content,
+                status_code=response.status_code,
+                headers=dict(response.headers)
+            )
+else:
+    # Serve static files in production
+    dist_path = Path("dist/public")
+    if dist_path.exists():
+        app.mount("/", StaticFiles(directory="dist/public", html=True), name="static")
 
 if __name__ == "__main__":
     import uvicorn

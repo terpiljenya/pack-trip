@@ -24,10 +24,10 @@ PackTrip AI is a group travel planning application that facilitates collaborativ
 ### Project Structure
 ```
 ├── client/           # React frontend application
-├── server/           # Express backend server
-├── shared/           # Shared TypeScript schemas and types
-├── migrations/       # Database migration files
-└── attached_assets/  # Project requirements and documentation
+├── backend/          # Python FastAPI backend
+├── shared/           # Shared TypeScript schemas and types (for frontend)
+├── attached_assets/  # Project requirements and documentation
+└── dev.py           # Development server script
 ```
 
 ## Key Components
@@ -106,6 +106,12 @@ The application uses a PostgreSQL database with the following main entities:
   - Fixed SQLAlchemy metadata column name conflicts
   - Created Pydantic schemas for request/response validation
   - Backend API ready at port 8000 (requires manual startup)
+- July 06, 2025. Completed switch to Python backend:
+  - Removed Express server folder
+  - Updated FastAPI to serve frontend and API on port 5000
+  - Created dev.py script to run both Vite and FastAPI
+  - Python backend now running (manual start required)
+  - Note: Workflow configuration needs manual update
 
 ## User Preferences
 

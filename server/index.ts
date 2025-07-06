@@ -1,70 +1,35 @@
-import express, { type Request, Response, NextFunction } from "express";
-import { registerRoutes } from "./routes";
-import { setupVite, serveStatic, log } from "./vite";
+// This is a wrapper script to start the Python backend
+import { spawn } from 'child_process';
 
-const app = express();
-app.use(express.json());
-app.use(express.urlencoded({ extended: false }));
+console.log("Starting Python FastAPI backend...");
 
-app.use((req, res, next) => {
-  const start = Date.now();
-  const path = req.path;
-  let capturedJsonResponse: Record<string, any> | undefined = undefined;
+// Start the Python backend directly without reload to avoid multiprocessing issues
+const pythonProcess = spawn('python3', ['-c', `
+import sys
+sys.path.insert(0, '.')
+import os
+os.environ["PYTHONPATH"] = "."
+os.environ["NODE_ENV"] = "development"
 
-  const originalResJson = res.json;
-  res.json = function (bodyJson, ...args) {
-    capturedJsonResponse = bodyJson;
-    return originalResJson.apply(res, [bodyJson, ...args]);
-  };
+# Start Vite
+import subprocess
+print("Starting Vite frontend on port 5173...")
+vite = subprocess.Popen(["npx", "vite", "--host", "0.0.0.0", "--port", "5173"])
 
-  res.on("finish", () => {
-    const duration = Date.now() - start;
-    if (path.startsWith("/api")) {
-      let logLine = `${req.method} ${path} ${res.statusCode} in ${duration}ms`;
-      if (capturedJsonResponse) {
-        logLine += ` :: ${JSON.stringify(capturedJsonResponse)}`;
-      }
-
-      if (logLine.length > 80) {
-        logLine = logLine.slice(0, 79) + "…";
-      }
-
-      log(logLine);
-    }
-  });
-
-  next();
+# Start FastAPI without reload
+print("Starting FastAPI backend on port 5000...")
+import uvicorn
+uvicorn.run("backend.main:app", host="0.0.0.0", port=5000, log_level="info")
+`], {
+  stdio: 'inherit',
+  cwd: process.cwd()
 });
 
-(async () => {
-  const server = await registerRoutes(app);
+pythonProcess.on('error', (err) => {
+  console.error('Failed to start Python backend:', err);
+  process.exit(1);
+});
 
-  app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
-    const status = err.status || err.statusCode || 500;
-    const message = err.message || "Internal Server Error";
-
-    res.status(status).json({ message });
-    throw err;
-  });
-
-  // importantly only setup vite in development and after
-  // setting up all the other routes so the catch-all route
-  // doesn't interfere with the other routes
-  if (app.get("env") === "development") {
-    await setupVite(app, server);
-  } else {
-    serveStatic(app);
-  }
-
-  // ALWAYS serve the app on port 5000
-  // this serves both the API and the client.
-  // It is the only port that is not firewalled.
-  const port = 5000;
-  server.listen({
-    port,
-    host: "0.0.0.0",
-    reusePort: true,
-  }, () => {
-    log(`serving on port ${port}`);
-  });
-})();
+pythonProcess.on('exit', (code) => {
+  process.exit(code || 0);
+});
