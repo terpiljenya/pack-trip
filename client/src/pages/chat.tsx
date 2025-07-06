@@ -80,7 +80,19 @@ export default function ChatPage() {
 
   // Check for consensus and trigger trip planning
   useEffect(() => {
-    if (!tripContext || tripContext.state !== 'COLLECTING_DATES') return;
+    if (!tripContext) return;
+    
+    // Only check for consensus if we're in the date collection phase
+    // and haven't already shown the planning message
+    if (tripContext.state !== 'COLLECTING_DATES') return;
+    
+    // Check if we already have the message about options
+    const hasOptionsMessage = tripContext.messages.some(msg => 
+      msg.type === 'agent' && 
+      msg.content.includes('3 fantastic itinerary options')
+    );
+    
+    if (hasOptionsMessage) return;
     
     // Count dates where everyone is available
     const dateAvailability: { [key: string]: Set<number> } = {};
@@ -101,8 +113,12 @@ export default function ChatPage() {
       .filter(([_, users]) => users.size === totalParticipants)
       .map(([date]) => date);
     
-    // If we have at least 3 consensus dates and haven't generated options yet
-    if (consensusDates.length >= 3 && tripContext.options.length === 0) {
+    // Check if all participants have marked some dates
+    const participantsWithDates = new Set(tripContext.availability.map(a => a.userId));
+    const allParticipantsMarkedDates = participantsWithDates.size === totalParticipants;
+    
+    // If we have at least 3 consensus dates and all participants have marked dates
+    if (consensusDates.length >= 3 && allParticipantsMarkedDates) {
       // Small delay to ensure all participants have marked their dates
       const timer = setTimeout(async () => {
         try {

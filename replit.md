@@ -129,6 +129,8 @@ The application uses a PostgreSQL database with the following main entities:
   - Added frontend logic to detect consensus (3+ dates where everyone is available)
   - Trip options are generated only once when consensus is reached
   - Added mock trip options for Barcelona (Cultural, Beach & Nightlife, Balanced)
+  - Fixed reset function to properly clean trip state and options
+  - Added check to ensure all participants have marked dates before generating
 
 ## User Preferences
 

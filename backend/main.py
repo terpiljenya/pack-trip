@@ -545,6 +545,14 @@ async def reset_carol(request: dict, db: Session = Depends(get_db)):
     if participant:
         participant.has_submitted_preferences = False
         participant.has_submitted_availability = False
+    
+    # Reset trip state to COLLECTING_DATES if it was in voting
+    trip = db.query(Trip).filter(Trip.trip_id == trip_id).first()
+    if trip and trip.state == "VOTING_HIGH_LEVEL":
+        trip.state = "COLLECTING_DATES"
+    
+    # Delete all trip options
+    db.query(TripOption).filter(TripOption.trip_id == trip_id).delete()
 
     db.commit()
     
