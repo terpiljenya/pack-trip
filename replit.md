@@ -149,6 +149,38 @@ The application uses a PostgreSQL database with the following main entities:
   - Updated consensus display to show "Full consensus reached!" at 100%
   - Added sample votes from all users for UI testing purposes
 
+## Next Steps Plan
+
+### 1. Complete End-to-End Experience (Detailed Trip Planning)
+- **Trigger**: When voting reaches consensus (100% votes on one option)
+- **Implementation**:
+  - Add OpenAI integration to backend
+  - Create endpoint `/api/trips/{trip_id}/generate-detailed-plan`
+  - Generate detailed itinerary with specific places, times, and activities
+  - Store as new message type "detailed_plan" with structured data
+  - Display in chat as expandable cards with daily breakdown
+
+### 2. Create New Trips
+- **Implementation**:
+  - Add landing page with "Create New Trip" button
+  - Generate unique trip IDs (e.g., "NYC-2025-001")
+  - Create trip initialization flow (destination, dates, title)
+  - Auto-join creator as first participant
+
+### 3. Invite Links & Authorization
+- **Implementation**:
+  - Generate shareable links: `/join/{trip_id}?token={invite_token}`
+  - Create simple auth system (no passwords, just display names)
+  - Store user session after joining
+  - Add participant limit and expiration to invites
+
+### 4. Map Integration
+- **Implementation**:
+  - Use Leaflet for open-source maps (no API key needed)
+  - Parse locations from detailed plan
+  - Show numbered markers for each day's activities
+  - Add map view tab in context drawer
+
 ## User Preferences
 
 Preferred communication style: Simple, everyday language.
