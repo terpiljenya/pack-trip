@@ -78,7 +78,7 @@ export function useTripState(tripId: string, userId: number) {
   const setAvailabilityMutation = useMutation({
     mutationFn: async ({ date, available }: { date: Date; available: boolean }) => {
       const response = await apiRequest('POST', `/api/trips/${tripId}/availability`, {
-        userId,
+        user_id: userId,
         date: date.toISOString(),
         available
       });
@@ -115,10 +115,10 @@ export function useTripState(tripId: string, userId: number) {
     state: trip?.state || 'INIT',
     participants: participants.map((p: any) => ({
       id: p.id,
-      userId: p.userId,
-      displayName: p.user?.displayName || 'Unknown',
+      userId: p.user_id,
+      displayName: p.user?.display_name || 'Unknown',
       color: p.user?.color || '#2864FF',
-      isOnline: p.isOnline,
+      isOnline: p.is_online,
       role: p.role
     })),
     messages: messages.map((m: any) => ({
@@ -131,8 +131,10 @@ export function useTripState(tripId: string, userId: number) {
       timestamp: new Date(v.timestamp)
     })),
     availability: availability.map((a: any) => ({
-      ...a,
-      date: new Date(a.date)
+      id: a.id,
+      userId: a.user_id,
+      date: new Date(a.date),
+      available: a.available
     }))
   };
 
