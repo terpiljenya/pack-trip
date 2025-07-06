@@ -14,7 +14,7 @@ interface QuickVoteChipsProps {
   userId: number;
 }
 
-const EMOJI_OPTIONS = ['👍', '❤️', '💸'];
+const EMOJI_OPTIONS = ['👍'];
 
 export default function QuickVoteChips({ 
   optionId, 

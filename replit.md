@@ -142,6 +142,12 @@ The application uses a PostgreSQL database with the following main entities:
   - Backend now checks for existing options before creating new ones
   - Backend prevents duplicate AI messages when options already exist
   - Reset function properly clears trip state and options
+- July 06, 2025. Fixed voting system and simplified UI:
+  - Fixed field name mapping between frontend (camelCase) and backend (snake_case)
+  - Simplified voting to only use 👍 emoji for clearer consensus tracking
+  - Fixed consensus calculation to count unique voters with thumbs up
+  - Updated consensus display to show "Full consensus reached!" at 100%
+  - Added sample votes from all users for UI testing purposes
 
 ## User Preferences
 

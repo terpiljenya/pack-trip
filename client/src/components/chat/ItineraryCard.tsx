@@ -52,16 +52,24 @@ export default function ItineraryCard({
     return acc;
   }, {} as Record<string, typeof votes>);
 
-  const totalVotes = votes.length;
-  const uniqueVoters = new Set(votes.map(v => v.userId)).size;
-  const consensusPercentage = (uniqueVoters / participants.length) * 100;
+  // Count unique voters who voted with thumbs up
+  const thumbsUpVoters = new Set(
+    votes.filter(v => v.emoji === '👍').map(v => v.userId)
+  ).size;
+  const consensusPercentage = (thumbsUpVoters / participants.length) * 100;
 
   const handleVote = (emoji: string) => {
     onVote({ optionId: option.optionId, emoji });
   };
 
-  const getVoterAvatars = (votes: typeof option.votes) => {
-    return votes.map(vote => {
+  const getVoterAvatars = (votes: Array<{
+    id: number;
+    userId: number;
+    optionId: string;
+    emoji: string;
+    timestamp: Date;
+  }>) => {
+    return votes.map((vote) => {
       const participant = participants.find(p => p.userId === vote.userId);
       return participant;
     }).filter(Boolean);
@@ -113,7 +121,7 @@ export default function ItineraryCard({
             <div className="flex -space-x-1">
               {Object.entries(votesByEmoji).map(([emoji, emojiVotes]) => {
                 const voters = getVoterAvatars(emojiVotes);
-                return voters.map((voter, index) => (
+                return voters.map((voter: any, index: number) => (
                   <Avatar key={`${emoji}-${index}`} className="w-6 h-6 border-2 border-white">
                     <AvatarFallback 
                       className="text-white text-xs font-medium"
@@ -125,15 +133,15 @@ export default function ItineraryCard({
                 ));
               })}
             </div>
-            {totalVotes > 0 && (
+            {thumbsUpVoters > 0 && (
               <span className="text-xs text-slate-500">
-                {totalVotes} vote{totalVotes !== 1 ? 's' : ''}
+                {thumbsUpVoters} vote{thumbsUpVoters !== 1 ? 's' : ''}
               </span>
             )}
           </div>
         </div>
         
-        {consensusPercentage >= 80 && (
+        {consensusPercentage === 100 && (
           <div className="mt-3 p-2 bg-green-50 border border-green-200 rounded-lg">
             <div className="flex items-center text-sm text-green-800">
               <div className="w-4 h-4 bg-green-500 rounded-full flex items-center justify-center mr-2">
@@ -141,7 +149,7 @@ export default function ItineraryCard({
                   <path d="M6.564.75l-3.59 3.612-1.538-1.55L0 4.26l2.974 2.99L8 2.193z"/>
                 </svg>
               </div>
-              <span className="font-medium">80% consensus reached!</span>
+              <span className="font-medium">Full consensus reached!</span>
             </div>
           </div>
         )}
