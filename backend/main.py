@@ -399,114 +399,146 @@ async def generate_trip_options(trip_id: str, db: Session = Depends(get_db)):
     if not trip:
         raise HTTPException(status_code=404, detail="Trip not found")
     
+    # Check if options already exist
+    existing_options = db.query(TripOption).filter(
+        TripOption.trip_id == trip_id
+    ).count()
+    
+    if existing_options > 0:
+        return {"success": False, "message": "Options already generated"}
+
     # Get all participants preferences
     preferences = db.query(UserPreferences).filter(
         UserPreferences.trip_id == trip_id).all()
-    
+
     # Get availability data
     availability = db.query(DateAvailability).filter(
         DateAvailability.trip_id == trip_id).all()
-    
+
     # Find dates where everyone is available
     date_counts = {}
     total_participants = db.query(TripParticipant).filter(
         TripParticipant.trip_id == trip_id).count()
-    
+
     for avail in availability:
         if avail.available:
             date_str = avail.date.strftime("%Y-%m-%d")
             date_counts[date_str] = date_counts.get(date_str, 0) + 1
-    
+
     # Get dates where everyone is available
-    consensus_dates = [date for date, count in date_counts.items() 
-                      if count == total_participants]
-    
+    consensus_dates = [
+        date for date, count in date_counts.items()
+        if count == total_participants
+    ]
+
     if len(consensus_dates) < 3:
         return {"error": "Not enough consensus dates to plan a trip"}
-    
+
     # Mock options for now
-    options = [
-        {
-            "option_id": "bcn-option-1",
-            "type": "itinerary",
-            "title": "Cultural Barcelona Explorer",
-            "description": "Perfect for art lovers and history buffs. Includes Sagrada Familia, Park Güell, Gothic Quarter tours, and world-class museums.",
-            "price": 1150,
-            "image": "https://images.unsplash.com/photo-1523531294919-4bcd7c65e216?w=400",
-            "meta_data": {
-                "highlights": ["Sagrada Familia Skip-the-line", "Gothic Quarter Walking Tour", "Picasso Museum", "Tapas Tasting"],
-                "duration": "5 days",
-                "accommodation": "4-star hotel in Eixample"
-            }
-        },
-        {
-            "option_id": "bcn-option-2",
-            "type": "itinerary",
-            "title": "Beach & Nightlife Experience",
-            "description": "Sun, sand, and Barcelona's famous nightlife. Beach activities, rooftop bars, and the best clubs in the city.",
-            "price": 1200,
-            "image": "https://images.unsplash.com/photo-1539037116277-4db20889f2d4?w=400",
-            "meta_data": {
-                "highlights": ["Beach Day at Barceloneta", "Rooftop Bar Tour", "Flamenco Show", "Nightclub VIP Access"],
-                "duration": "5 days",
-                "accommodation": "Beachfront hotel"
-            }
-        },
-        {
-            "option_id": "bcn-option-3",
-            "type": "itinerary",
-            "title": "Balanced Barcelona Adventure",
-            "description": "The best of both worlds - culture by day, fun by night. A perfect mix of sightseeing, food, and entertainment.",
-            "price": 1175,
-            "image": "https://images.unsplash.com/photo-1558642084-fd07fae5282e?w=400",
-            "meta_data": {
-                "highlights": ["La Rambla & Boqueria Market", "Cable Car to Montjuïc", "Beach Afternoon", "Tapas & Wine Tour"],
-                "duration": "5 days",
-                "accommodation": "Boutique hotel in El Born"
-            }
+    options = [{
+        "option_id": "bcn-option-1",
+        "type": "itinerary",
+        "title": "Cultural Barcelona Explorer",
+        "description":
+        "Perfect for art lovers and history buffs. Includes Sagrada Familia, Park Güell, Gothic Quarter tours, and world-class museums.",
+        "price": 1150,
+        "image":
+        "https://images.unsplash.com/photo-1523531294919-4bcd7c65e216?w=400",
+        "meta_data": {
+            "highlights": [
+                "Sagrada Familia Skip-the-line", "Gothic Quarter Walking Tour",
+                "Picasso Museum", "Tapas Tasting"
+            ],
+            "duration":
+            "5 days",
+            "accommodation":
+            "4-star hotel in Eixample"
         }
-    ]
-    
+    }, {
+        "option_id": "bcn-option-2",
+        "type": "itinerary",
+        "title": "Beach & Nightlife Experience",
+        "description":
+        "Sun, sand, and Barcelona's famous nightlife. Beach activities, rooftop bars, and the best clubs in the city.",
+        "price": 1200,
+        "image":
+        "https://images.unsplash.com/photo-1539037116277-4db20889f2d4?w=400",
+        "meta_data": {
+            "highlights": [
+                "Beach Day at Barceloneta", "Rooftop Bar Tour",
+                "Flamenco Show", "Nightclub VIP Access"
+            ],
+            "duration":
+            "5 days",
+            "accommodation":
+            "Beachfront hotel"
+        }
+    }, {
+        "option_id": "bcn-option-3",
+        "type": "itinerary",
+        "title": "Balanced Barcelona Adventure",
+        "description":
+        "The best of both worlds - culture by day, fun by night. A perfect mix of sightseeing, food, and entertainment.",
+        "price": 1175,
+        "image":
+        "https://images.unsplash.com/photo-1558642084-fd07fae5282e?w=400",
+        "meta_data": {
+            "highlights": [
+                "La Rambla & Boqueria Market", "Cable Car to Montjuïc",
+                "Beach Afternoon", "Tapas & Wine Tour"
+            ],
+            "duration":
+            "5 days",
+            "accommodation":
+            "Boutique hotel in El Born"
+        }
+    }]
+
     # Save options to database
     for opt in options:
         # Check if option already exists
         existing = db.query(TripOption).filter(
             TripOption.trip_id == trip_id,
-            TripOption.option_id == opt["option_id"]
-        ).first()
-        
+            TripOption.option_id == opt["option_id"]).first()
+
         if not existing:
-            db_option = TripOption(
-                trip_id=trip_id,
-                **opt
-            )
+            db_option = TripOption(trip_id=trip_id, **opt)
             db.add(db_option)
+
+    # Check if options message already exists
+    existing_message = db.query(Message).filter(
+        Message.trip_id == trip_id,
+        Message.type == "agent",
+        Message.content.like("%3 fantastic itinerary options%")
+    ).first()
     
-    # Add AI message
-    ai_message = Message(
-        trip_id=trip_id,
-        user_id=None,
-        type="agent",
-        content=f"Great! I can see everyone has shared their availability. I found {len(consensus_dates)} dates where everyone is available. Based on your preferences, I have 3 fantastic itinerary options for Barcelona. Let me know which one excites you most!"
-    )
-    db.add(ai_message)
-    
+    if not existing_message:
+        # Add AI message
+        ai_message = Message(
+            trip_id=trip_id,
+            user_id=None,
+            type="agent",
+            content=
+            f"Great! I can see everyone has shared their availability. I found {len(consensus_dates)} dates where everyone is available. Based on your preferences, I have 3 fantastic itinerary options for Barcelona. Let me know which one excites you most!"
+        )
+        db.add(ai_message)
+
     # Update trip state
     trip.state = "VOTING_HIGH_LEVEL"
-    
+
     db.commit()
-    
+
     # Broadcast updates
     await manager.broadcast_to_trip(trip_id, {
         "type": "options_generated",
         "timestamp": datetime.utcnow().isoformat()
     })
-    
+
     await manager.broadcast_to_trip(trip_id, {
         "type": "new_message",
         "timestamp": datetime.utcnow().isoformat()
     })
-    
+
     return {
         "success": True,
         "consensus_dates": consensus_dates,
@@ -545,87 +577,91 @@ async def reset_carol(request: dict, db: Session = Depends(get_db)):
     if participant:
         participant.has_submitted_preferences = False
         participant.has_submitted_availability = False
-    
+
     # Reset trip state to COLLECTING_DATES if it was in voting
     trip = db.query(Trip).filter(Trip.trip_id == trip_id).first()
     if trip and trip.state == "VOTING_HIGH_LEVEL":
         trip.state = "COLLECTING_DATES"
-    
+
     # Delete all trip options
     db.query(TripOption).filter(TripOption.trip_id == trip_id).delete()
 
     db.commit()
-    
+
     # Recreate initial messages
     initial_messages = [
         Message(
             trip_id=trip_id,
             user_id=None,
             type="agent",
-            content="Welcome to PackTrip AI! I'll help your group plan the perfect trip to Barcelona. Let's start by gathering everyone's preferences."
+            content=
+            "Welcome to PackTrip AI! I'll help your group plan the perfect trip to Barcelona. Let's start by gathering everyone's preferences."
         ),
         Message(
             trip_id=trip_id,
             user_id=1,
             type="user",
-            content="Hey everyone! So excited to plan our Barcelona trip 🇪🇸"
-        ),
-        Message(
-            trip_id=trip_id,
-            user_id=None,
-            type="system",
-            content="Carol Williams has joined the trip planning"
-        ),
+            content="Hey everyone! So excited to plan our Barcelona trip 🇪🇸"),
+        Message(trip_id=trip_id,
+                user_id=None,
+                type="system",
+                content="Carol Williams has joined the trip planning"),
         Message(
             trip_id=trip_id,
             user_id=2,
             type="user",
-            content="Barcelona sounds amazing! I've always wanted to visit"
-        ),
+            content="Barcelona sounds amazing! I've always wanted to visit"),
         Message(
             trip_id=trip_id,
             user_id=None,
             type="agent",
-            content="Great to have everyone here! I see we're planning for October with a budget of around $1,200 per person for 5 days. To create the perfect itinerary for your group, I'll need to understand everyone's preferences.\n\nAlice and Bob - you've shared your travel styles, and I see Carol just joined us. Carol, could you share your preferences too?"
+            content=
+            "Great to have everyone here! I see we're planning for October with a budget of around $1,200 per person for 5 days. To create the perfect itinerary for your group, I'll need to understand everyone's preferences.\n\nAlice and Bob - you've shared your travel styles, and I see Carol just joined us. Carol, could you share your preferences too?"
         ),
         Message(
             trip_id=trip_id,
             user_id=1,
             type="user",
-            content="I'm thinking October would be perfect - great weather and fewer crowds! Budget of around $1,200 per person for 5 days?"
+            content=
+            "I'm thinking October would be perfect - great weather and fewer crowds! Budget of around $1,200 per person for 5 days?"
         ),
         Message(
             trip_id=trip_id,
             user_id=2,
             type="user",
-            content="Perfect! October works for me. I'm flexible on dates but prefer mid-month. Budget looks good too! 👍"
+            content=
+            "Perfect! October works for me. I'm flexible on dates but prefer mid-month. Budget looks good too! 👍"
         ),
         Message(
             trip_id=trip_id,
             user_id=None,
             type="agent",
-            content="Excellent! Barcelona in October is a fantastic choice. Now let's coordinate your dates - I need everyone to mark their availability on the calendar below. Click on the dates you're available to travel!"
+            content=
+            "Excellent! Barcelona in October is a fantastic choice. Now let's coordinate your dates - I need everyone to mark their availability on the calendar below. Click on the dates you're available to travel!"
         ),
         Message(
             trip_id=trip_id,
             user_id=None,
             type="system",
-            content="Alice Johnson has shared their preferences:\n• Budget: medium\n• Accommodation: hotel\n• Travel style: cultural\n• Activities: sightseeing, museums, food tours, shopping\n• Dietary: Vegetarian\n• Special needs: Quiet rooms preferred"
+            content=
+            "Alice Johnson has shared their preferences:\n• Budget: medium\n• Accommodation: hotel\n• Travel style: cultural\n• Activities: sightseeing, museums, food tours, shopping\n• Dietary: Vegetarian\n• Special needs: Quiet rooms preferred"
         ),
         Message(
             trip_id=trip_id,
             user_id=None,
             type="system",
-            content="Bob Smith has shared their preferences:\n• Budget: medium\n• Accommodation: hotel\n• Travel style: adventure\n• Activities: beach, outdoor activities, nightlife, food tours\n• Special needs: Close to nightlife areas"
+            content=
+            "Bob Smith has shared their preferences:\n• Budget: medium\n• Accommodation: hotel\n• Travel style: adventure\n• Activities: beach, outdoor activities, nightlife, food tours\n• Special needs: Close to nightlife areas"
         ),
         Message(
             trip_id=trip_id,
             user_id=None,
             type="agent",
-            content="Great! I have Alice and Bob's preferences. Carol, when you join, please share your travel preferences so I can create the perfect trip for everyone!"
+            content=
+            "Great! I have Alice and Bob's preferences. Carol, when you join, please share your travel preferences so I can create the perfect trip for everyone!"
         )
     ]
-    
+
     for msg in initial_messages:
         db.add(msg)
     db.commit()

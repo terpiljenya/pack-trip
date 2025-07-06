@@ -78,6 +78,9 @@ export default function ChatPage() {
     }
   }, [missingPreferences, preferences, userId]);
 
+  // Track if we're currently generating options to prevent duplicate calls
+  const [isGeneratingOptions, setIsGeneratingOptions] = useState(false);
+  
   // Check for consensus and trigger trip planning
   useEffect(() => {
     if (!tripContext) return;
@@ -85,6 +88,12 @@ export default function ChatPage() {
     // Only check for consensus if we're in the date collection phase
     // and haven't already shown the planning message
     if (tripContext.state !== 'COLLECTING_DATES') return;
+    
+    // If we're already generating options, don't trigger again
+    if (isGeneratingOptions) return;
+    
+    // Check if we already have options in the system
+    if (tripContext.options.length > 0) return;
     
     // Check if we already have the message about options
     const hasOptionsMessage = tripContext.messages.some(msg => 
@@ -119,6 +128,9 @@ export default function ChatPage() {
     
     // If we have at least 3 consensus dates and all participants have marked dates
     if (consensusDates.length >= 3 && allParticipantsMarkedDates) {
+      // Set generating flag to prevent duplicate calls
+      setIsGeneratingOptions(true);
+      
       // Small delay to ensure all participants have marked their dates
       const timer = setTimeout(async () => {
         try {
@@ -133,12 +145,18 @@ export default function ChatPage() {
           }
         } catch (error) {
           console.error('Failed to generate options:', error);
+          // Reset the flag on error
+          setIsGeneratingOptions(false);
         }
       }, 2000);
       
-      return () => clearTimeout(timer);
+      return () => {
+        clearTimeout(timer);
+        // Reset flag if component unmounts
+        setIsGeneratingOptions(false);
+      };
     }
-  }, [tripContext, tripId, toast]);
+  }, [tripContext, tripId, toast, isGeneratingOptions]);
 
   const handlePreferencesSubmit = async (data: any) => {
     try {

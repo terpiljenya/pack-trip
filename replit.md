@@ -137,6 +137,11 @@ The application uses a PostgreSQL database with the following main entities:
   - Options now properly display when consensus is reached
   - Fixed data transformation in useTripState hook to map snake_case to camelCase
   - Options now properly map option_id -> optionId and meta_data -> metadata
+- July 06, 2025. Fixed duplicate option generation:
+  - Added state tracking (isGeneratingOptions) to prevent multiple API calls
+  - Backend now checks for existing options before creating new ones
+  - Backend prevents duplicate AI messages when options already exist
+  - Reset function properly clears trip state and options
 
 ## User Preferences
 
