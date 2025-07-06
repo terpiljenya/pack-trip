@@ -60,7 +60,8 @@ export default function ChatMessage({
   onSetAvailability,
   userId
 }: ChatMessageProps) {
-  const participant = participants.find(p => p.userId === message.userId);
+  // Convert both to numbers to ensure proper comparison
+  const participant = participants.find(p => Number(p.userId) === Number(message.userId));
   const isSystem = message.type === 'system';
   const isAgent = message.type === 'agent';
   const isUser = message.type === 'user';

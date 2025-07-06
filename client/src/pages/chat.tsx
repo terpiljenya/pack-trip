@@ -105,19 +105,23 @@ export default function ChatPage() {
 
         {/* Messages */}
         <div className="flex-1 overflow-y-auto p-4 space-y-4">
-          {tripContext.messages.map((message) => (
-            <ChatMessage
-              key={message.id}
-              message={message}
-              participants={tripContext.participants}
-              options={tripContext.options}
-              votes={tripContext.votes}
-              availability={tripContext.availability}
-              onVote={vote}
-              onSetAvailability={setAvailability}
-              userId={userId}
-            />
-          ))}
+          {tripContext.participants.length > 0 ? (
+            tripContext.messages.map((message) => (
+              <ChatMessage
+                key={message.id}
+                message={message}
+                participants={tripContext.participants}
+                options={tripContext.options}
+                votes={tripContext.votes}
+                availability={tripContext.availability}
+                onVote={vote}
+                onSetAvailability={setAvailability}
+                userId={userId}
+              />
+            ))
+          ) : (
+            <div className="text-center text-gray-500">Loading participants...</div>
+          )}
           
           {!isConnected && (
             <div className="text-center py-4">

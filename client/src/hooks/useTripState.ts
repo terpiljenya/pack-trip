@@ -122,8 +122,12 @@ export function useTripState(tripId: string, userId: number) {
       role: p.role
     })),
     messages: messages.map((m: any) => ({
-      ...m,
-      timestamp: new Date(m.timestamp)
+      id: m.id,
+      userId: m.user_id,
+      type: m.type,
+      content: m.content,
+      timestamp: new Date(m.timestamp),
+      metadata: m.meta_data
     })),
     options,
     votes: votes.map((v: any) => ({
