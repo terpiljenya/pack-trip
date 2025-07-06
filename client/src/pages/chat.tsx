@@ -1,0 +1,149 @@
+import { useParams } from 'wouter';
+import { useTripState } from '@/hooks/useTripState';
+import { useIsMobile } from '@/hooks/use-mobile';
+import { useState } from 'react';
+import { Plane, Users, Calendar, MapPin, Menu, X } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
+import { Badge } from '@/components/ui/badge';
+import ChatMessage from '@/components/chat/ChatMessage';
+import MessageInput from '@/components/chat/MessageInput';
+import ContextDrawer from '@/components/chat/ContextDrawer';
+
+export default function ChatPage() {
+  const params = useParams();
+  const tripId = params.tripId || 'BCN-2024-001';
+  const userId = 1; // TODO: Get from auth context
+  const isMobile = useIsMobile();
+  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+  
+  const { tripContext, sendMessage, vote, setAvailability, isConnected } = useTripState(tripId, userId);
+
+  const getStateDisplay = (state: string) => {
+    switch (state) {
+      case 'COLLECTING_DATES':
+        return { label: 'Collecting Dates', color: 'bg-orange-100 text-orange-800' };
+      case 'VOTING_HIGH_LEVEL':
+        return { label: 'Voting on Options', color: 'bg-blue-100 text-blue-800' };
+      case 'ITINERARY_LOCKED':
+        return { label: 'Itinerary Locked', color: 'bg-green-100 text-green-800' };
+      default:
+        return { label: 'Planning', color: 'bg-gray-100 text-gray-800' };
+    }
+  };
+
+  const stateDisplay = getStateDisplay(tripContext.state);
+  const onlineParticipants = tripContext.participants.filter(p => p.isOnline);
+
+  return (
+    <div className="h-screen flex flex-col lg:flex-row bg-slate-50">
+      {/* Mobile Header */}
+      {isMobile && (
+        <div className="bg-white border-b border-slate-200 px-4 py-3 flex items-center justify-between">
+          <div className="flex items-center space-x-3">
+            <div className="w-10 h-10 bg-primary rounded-full flex items-center justify-center">
+              <Plane className="w-5 h-5 text-white" />
+            </div>
+            <div>
+              <h1 className="text-lg font-semibold text-slate-900">PackTrip AI</h1>
+              <p className="text-xs text-slate-500">Barcelona Trip Planning</p>
+            </div>
+          </div>
+          <Sheet open={isDrawerOpen} onOpenChange={setIsDrawerOpen}>
+            <SheetTrigger asChild>
+              <Button variant="ghost" size="icon">
+                <Menu className="w-5 h-5" />
+              </Button>
+            </SheetTrigger>
+            <SheetContent side="right" className="w-full max-w-md p-0">
+              <ContextDrawer 
+                tripContext={tripContext}
+                onVote={vote}
+                onSetAvailability={setAvailability}
+                userId={userId}
+              />
+            </SheetContent>
+          </Sheet>
+        </div>
+      )}
+
+      {/* Main Chat Area */}
+      <div className="flex-1 flex flex-col lg:w-7/10">
+        {/* Desktop Header */}
+        {!isMobile && (
+          <div className="bg-white border-b border-slate-200 px-6 py-4 flex items-center justify-between">
+            <div className="flex items-center space-x-4">
+              <div className="w-12 h-12 bg-primary rounded-2xl flex items-center justify-center">
+                <Plane className="w-6 h-6 text-white" />
+              </div>
+              <div>
+                <h1 className="text-xl font-semibold text-slate-900">PackTrip AI</h1>
+                <p className="text-sm text-slate-500">
+                  Barcelona Trip Planning • {tripContext.participants.length} travelers
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center space-x-4">
+              <Badge className={stateDisplay.color}>
+                <Calendar className="w-3 h-3 mr-1" />
+                {stateDisplay.label}
+              </Badge>
+              <div className="flex -space-x-2">
+                {onlineParticipants.map((participant) => (
+                  <div
+                    key={participant.id}
+                    className="w-8 h-8 rounded-full border-2 border-white relative"
+                    style={{ backgroundColor: participant.color }}
+                  >
+                    <div className="absolute -top-1 -right-1 w-3 h-3 bg-green-500 rounded-full border-2 border-white"></div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Messages */}
+        <div className="flex-1 overflow-y-auto p-4 space-y-4">
+          {tripContext.messages.map((message) => (
+            <ChatMessage
+              key={message.id}
+              message={message}
+              participants={tripContext.participants}
+              options={tripContext.options}
+              votes={tripContext.votes}
+              availability={tripContext.availability}
+              onVote={vote}
+              onSetAvailability={setAvailability}
+              userId={userId}
+            />
+          ))}
+          
+          {!isConnected && (
+            <div className="text-center py-4">
+              <div className="inline-flex items-center px-3 py-1 bg-orange-100 text-orange-800 rounded-full text-sm">
+                <div className="w-2 h-2 bg-orange-500 rounded-full mr-2 animate-pulse"></div>
+                Reconnecting...
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Message Input */}
+        <MessageInput onSendMessage={sendMessage} />
+      </div>
+
+      {/* Desktop Context Drawer */}
+      {!isMobile && (
+        <div className="lg:w-3/10 bg-white border-l border-slate-200">
+          <ContextDrawer 
+            tripContext={tripContext}
+            onVote={vote}
+            onSetAvailability={setAvailability}
+            userId={userId}
+          />
+        </div>
+      )}
+    </div>
+  );
+}
