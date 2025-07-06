@@ -479,6 +479,34 @@ async def startup_event():
         db.add(pref)
     db.commit()
     
+    # Add availability for Alice and Bob
+    from datetime import datetime, timedelta
+    base_date = datetime(2024, 10, 1)
+    
+    # Alice is available Oct 6-7, 13-14, 20-21
+    alice_dates = [6, 7, 13, 14, 20, 21]
+    for day in alice_dates:
+        avail = DateAvailability(
+            trip_id="BCN-2024-001",
+            user_id=1,
+            date=base_date + timedelta(days=day-1),
+            available=True
+        )
+        db.add(avail)
+    
+    # Bob is available Oct 6-7, 13-14 (overlaps with Alice), and 15-16
+    bob_dates = [6, 7, 13, 14, 15, 16]
+    for day in bob_dates:
+        avail = DateAvailability(
+            trip_id="BCN-2024-001",
+            user_id=2,
+            date=base_date + timedelta(days=day-1),
+            available=True
+        )
+        db.add(avail)
+    
+    db.commit()
+    
     # Add initial messages
     messages = [
         Message(

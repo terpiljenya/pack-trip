@@ -1,7 +1,8 @@
 import { useState } from 'react';
-import { Calendar, Clock } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
+import { Calendar, Check, Users } from 'lucide-react';
+import { cn } from '@/lib/utils';
+import { format } from 'date-fns';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 interface CalendarMatrixProps {
   availability: Array<{
@@ -53,18 +54,16 @@ export default function CalendarMatrix({
     return days;
   };
 
-  const getDateAvailability = (date: Date | null) => {
-    if (!date) return { available: 0, conflicts: 0, total: 0 };
+  const getAvailableUsers = (date: Date | null) => {
+    if (!date) return [];
     
     const dateAvailability = availability.filter(a => 
-      a.date.toDateString() === date.toDateString()
+      a.date.toDateString() === date.toDateString() && a.available
     );
     
-    const available = dateAvailability.filter(a => a.available).length;
-    const conflicts = dateAvailability.filter(a => !a.available).length;
-    const total = participants.length;
-    
-    return { available, conflicts, total };
+    return dateAvailability
+      .map(a => participants.find(p => p.userId === a.userId))
+      .filter(Boolean);
   };
 
   const isUserAvailable = (date: Date | null) => {
@@ -75,97 +74,122 @@ export default function CalendarMatrix({
     return userAvailability?.available || false;
   };
 
+  const isEveryoneAvailable = (date: Date | null) => {
+    if (!date) return false;
+    const availableUsers = getAvailableUsers(date);
+    return availableUsers.length === participants.length;
+  };
+
   const handleDateClick = (date: Date | null) => {
     if (!date) return;
     const currentlyAvailable = isUserAvailable(date);
     onSetAvailability({ date, available: !currentlyAvailable });
   };
 
-  const getDateStyle = (date: Date | null) => {
-    if (!date) return 'text-slate-400';
-    
-    const { available, conflicts, total } = getDateAvailability(date);
-    const userAvailable = isUserAvailable(date);
-    
-    if (conflicts > 0) {
-      return 'bg-red-100 text-red-800 border-red-200';
-    } else if (available === total) {
-      return 'bg-green-100 text-green-800 border-green-200';
-    } else if (available > 0) {
-      return 'bg-yellow-100 text-yellow-800 border-yellow-200';
-    } else if (userAvailable) {
-      return 'bg-blue-100 text-blue-800 border-blue-200';
-    } else {
-      return 'bg-slate-100 text-slate-600 border-slate-200 hover:bg-slate-200';
-    }
-  };
-
   const days = getDaysInMonth(selectedMonth);
   const weekDays = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+  const allAvailableDays = days.filter(date => date && isEveryoneAvailable(date)).length;
 
   return (
-    <div className="bg-white rounded-lg p-4 border border-slate-200 mt-4">
-      <h4 className="font-semibold text-slate-900 mb-3 flex items-center">
-        <Calendar className="w-4 h-4 mr-2 text-primary" />
-        October 2024 Availability
-      </h4>
-      
-      <div className="grid grid-cols-7 gap-1 text-xs mb-2">
-        {weekDays.map(day => (
-          <div key={day} className="text-center font-medium text-slate-600 py-2">
-            {day}
-          </div>
-        ))}
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <Calendar className="h-4 w-4" />
+          <h3 className="font-medium">October 2024</h3>
+        </div>
+        <p className="text-xs text-muted-foreground">Click dates to mark availability</p>
       </div>
       
-      <div className="grid grid-cols-7 gap-1 text-xs">
-        {days.map((date, index) => {
-          const dateStyle = getDateStyle(date);
-          const { available, total } = getDateAvailability(date);
+      <TooltipProvider>
+        <div className="grid grid-cols-7 gap-1 text-center text-sm">
+          {weekDays.map(day => (
+            <div key={day} className="font-medium text-muted-foreground p-2">
+              {day}
+            </div>
+          ))}
           
-          return (
-            <Button
-              key={index}
-              variant="ghost"
-              className={`
-                h-8 w-8 p-0 text-xs border rounded-md transition-colors
-                ${dateStyle}
-                ${date ? 'cursor-pointer' : 'cursor-default'}
-              `}
-              onClick={() => handleDateClick(date)}
-              disabled={!date}
-            >
-              {date ? (
-                <div className="flex flex-col items-center">
-                  <span>{date.getDate()}</span>
-                  {available > 0 && (
-                    <span className="text-xs opacity-70">
-                      {available}/{total}
-                    </span>
-                  )}
-                </div>
-              ) : null}
-            </Button>
-          );
-        })}
-      </div>
+          {days.map((date, index) => {
+            if (!date) {
+              return <div key={`empty-${index}`} className="p-2" />;
+            }
+            
+            const isUserAvail = isUserAvailable(date);
+            const availableUsers = getAvailableUsers(date);
+            const allAvailable = isEveryoneAvailable(date);
+            
+            return (
+              <Tooltip key={date.toISOString()}>
+                <TooltipTrigger asChild>
+                  <button
+                    onClick={() => handleDateClick(date)}
+                    className={cn(
+                      "relative p-2 rounded-md text-sm transition-all",
+                      "hover:scale-105 hover:shadow-md",
+                      allAvailable && "bg-green-500 text-white font-semibold",
+                      !allAvailable && availableUsers.length > 0 && "bg-amber-100 dark:bg-amber-900/20",
+                      isUserAvail && "ring-2 ring-primary ring-offset-1"
+                    )}
+                  >
+                    <div className="font-medium">{format(date, 'd')}</div>
+                    {isUserAvail && (
+                      <Check className="h-3 w-3 absolute top-0.5 right-0.5 text-primary" />
+                    )}
+                    {availableUsers.length > 0 && (
+                      <div className="flex justify-center mt-0.5">
+                        <div className="flex -space-x-1">
+                          {availableUsers.slice(0, 3).map((user) => (
+                            <div
+                              key={user.userId}
+                              className="w-2 h-2 rounded-full border border-background"
+                              style={{ backgroundColor: user.color }}
+                            />
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <div className="space-y-1 text-xs">
+                    <p className="font-medium">
+                      {format(date, 'EEEE, MMMM d')}
+                    </p>
+                    {availableUsers.length > 0 ? (
+                      <>
+                        <p className="text-muted-foreground">Available:</p>
+                        {availableUsers.map(user => (
+                          <p key={user.userId} className="flex items-center gap-1">
+                            <span 
+                              className="w-2 h-2 rounded-full"
+                              style={{ backgroundColor: user.color }}
+                            />
+                            {user.displayName}
+                          </p>
+                        ))}
+                      </>
+                    ) : (
+                      <p className="text-muted-foreground">No one available yet</p>
+                    )}
+                  </div>
+                </TooltipContent>
+              </Tooltip>
+            );
+          })}
+        </div>
+      </TooltipProvider>
       
-      <div className="mt-4 flex flex-wrap gap-2 text-xs">
-        <div className="flex items-center space-x-1">
-          <div className="w-3 h-3 bg-green-100 border border-green-200 rounded"></div>
-          <span className="text-slate-600">All Available</span>
+      <div className="space-y-2 text-sm">
+        <div className="flex items-center gap-2 p-2 bg-green-50 dark:bg-green-900/20 rounded-md">
+          <Users className="h-4 w-4 text-green-600 dark:text-green-400" />
+          <span className="font-medium text-green-700 dark:text-green-300">
+            Everyone Available: {allAvailableDays} days
+          </span>
         </div>
-        <div className="flex items-center space-x-1">
-          <div className="w-3 h-3 bg-yellow-100 border border-yellow-200 rounded"></div>
-          <span className="text-slate-600">Partial</span>
-        </div>
-        <div className="flex items-center space-x-1">
-          <div className="w-3 h-3 bg-red-100 border border-red-200 rounded"></div>
-          <span className="text-slate-600">Conflicts</span>
-        </div>
-        <div className="flex items-center space-x-1">
-          <div className="w-3 h-3 bg-slate-100 border border-slate-200 rounded"></div>
-          <span className="text-slate-600">Pending</span>
+        
+        <div className="text-xs text-muted-foreground space-y-1">
+          <p>• Click any date to toggle your availability</p>
+          <p>• Green dates = everyone is available</p>
+          <p>• Your selected dates have a blue ring</p>
         </div>
       </div>
     </div>
