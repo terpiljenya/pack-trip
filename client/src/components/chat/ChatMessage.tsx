@@ -87,7 +87,8 @@ export default function ChatMessage({
   }
 
   if (isAgent) {
-    const showCalendar = message.content.includes('calendar') || message.content.includes('dates') || message.content.includes('availability');
+    // Only show calendar when explicitly mentioning "mark their availability on the calendar below"
+    const showCalendar = message.content.includes('mark their availability on the calendar below') || message.content.includes('mark your availability on the calendar below');
     const showOptions = message.content.includes('itinerary options') || message.content.includes('3 fantastic itinerary options');
     const showConflict = message.content.includes('conflict');
 

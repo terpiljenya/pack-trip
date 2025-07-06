@@ -21,15 +21,18 @@ interface CalendarMatrixProps {
   }>;
   onSetAvailability: (data: { date: Date; available: boolean }) => void;
   userId: number;
+  isLoading?: boolean;
 }
 
 export default function CalendarMatrix({
   availability,
   participants,
   onSetAvailability,
-  userId
+  userId,
+  isLoading = false
 }: CalendarMatrixProps) {
   const [selectedMonth] = useState(new Date(2024, 9, 1)); // October 2024
+  const [clickedDate, setClickedDate] = useState<Date | null>(null);
 
   const getDaysInMonth = (date: Date) => {
     const year = date.getFullYear();
@@ -57,9 +60,13 @@ export default function CalendarMatrix({
   const getAvailableUsers = (date: Date | null) => {
     if (!date) return [];
     
-    const dateAvailability = availability.filter(a => 
-      a.date.toDateString() === date.toDateString() && a.available
-    );
+    const dateAvailability = availability.filter(a => {
+      const aDate = new Date(a.date);
+      return aDate.getFullYear() === date.getFullYear() &&
+             aDate.getMonth() === date.getMonth() &&
+             aDate.getDate() === date.getDate() &&
+             a.available;
+    });
     
     return dateAvailability
       .map(a => participants.find(p => p.userId === a.userId))
@@ -68,9 +75,13 @@ export default function CalendarMatrix({
 
   const isUserAvailable = (date: Date | null) => {
     if (!date) return false;
-    const userAvailability = availability.find(a => 
-      a.userId === userId && a.date.toDateString() === date.toDateString()
-    );
+    const userAvailability = availability.find(a => {
+      const aDate = new Date(a.date);
+      return a.userId === userId &&
+             aDate.getFullYear() === date.getFullYear() &&
+             aDate.getMonth() === date.getMonth() &&
+             aDate.getDate() === date.getDate();
+    });
     return userAvailability?.available || false;
   };
 
@@ -81,9 +92,15 @@ export default function CalendarMatrix({
   };
 
   const handleDateClick = (date: Date | null) => {
-    if (!date) return;
+    if (!date || isLoading) return;
+    // Create a date at noon UTC to avoid timezone issues
+    const utcDate = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate(), 12, 0, 0));
     const currentlyAvailable = isUserAvailable(date);
-    onSetAvailability({ date, available: !currentlyAvailable });
+    setClickedDate(date);
+    onSetAvailability({ date: utcDate, available: !currentlyAvailable });
+    
+    // Clear clicked date after a short delay
+    setTimeout(() => setClickedDate(null), 500);
   };
 
   const days = getDaysInMonth(selectedMonth);
@@ -122,11 +139,14 @@ export default function CalendarMatrix({
                 <TooltipTrigger asChild>
                   <button
                     onClick={() => handleDateClick(date)}
+                    disabled={isLoading}
                     className={cn(
                       "relative p-2 rounded-md text-sm transition-all",
                       "hover:scale-105 hover:shadow-md",
                       allAvailable && "bg-green-500 text-white font-semibold",
                       !allAvailable && availableUsers.length > 0 && "bg-amber-100 dark:bg-amber-900/20",
+                      clickedDate?.toDateString() === date.toDateString() && "animate-pulse",
+                      isLoading && "opacity-50 cursor-not-allowed",
                       isUserAvail && "ring-2 ring-primary ring-offset-1"
                     )}
                   >

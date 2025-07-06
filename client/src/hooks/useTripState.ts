@@ -86,7 +86,7 @@ export function useTripState(tripId: string, userId: number) {
     }
   });
 
-  // Set availability mutation
+  // Set availability mutation with optimistic update
   const setAvailabilityMutation = useMutation({
     mutationFn: async ({ date, available }: { date: Date; available: boolean }) => {
       const response = await apiRequest('POST', `/api/trips/${tripId}/availability`, {
@@ -96,7 +96,50 @@ export function useTripState(tripId: string, userId: number) {
       });
       return response.json();
     },
-    onSuccess: () => {
+    onMutate: async ({ date, available }) => {
+      // Cancel any outgoing refetches
+      await queryClient.cancelQueries({ queryKey: [`/api/trips/${tripId}/availability`] });
+
+      // Snapshot the previous value
+      const previousAvailability = queryClient.getQueryData([`/api/trips/${tripId}/availability`]);
+
+      // Optimistically update to the new value
+      queryClient.setQueryData([`/api/trips/${tripId}/availability`], (old: any) => {
+        if (!old) return old;
+        
+        // Check if availability already exists for this date/user
+        const existingIndex = old.findIndex((a: any) => 
+          a.user_id === userId && 
+          new Date(a.date).toDateString() === date.toDateString()
+        );
+
+        if (existingIndex >= 0) {
+          // Update existing
+          const newData = [...old];
+          newData[existingIndex] = { ...newData[existingIndex], available };
+          return newData;
+        } else {
+          // Add new
+          return [...old, {
+            id: Date.now(), // Temporary ID
+            user_id: userId,
+            date: date.toISOString(),
+            available
+          }];
+        }
+      });
+
+      // Return a context with the previous value
+      return { previousAvailability };
+    },
+    onError: (err, variables, context) => {
+      // If the mutation fails, use the context to roll back
+      if (context?.previousAvailability) {
+        queryClient.setQueryData([`/api/trips/${tripId}/availability`], context.previousAvailability);
+      }
+    },
+    onSettled: () => {
+      // Always refetch after error or success
       queryClient.invalidateQueries({ queryKey: [`/api/trips/${tripId}/availability`] });
     }
   });

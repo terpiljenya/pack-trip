@@ -118,6 +118,11 @@ The application uses a PostgreSQL database with the following main entities:
   - Added reset chat functionality to restart from initial state
   - Calendar shows green dates when everyone is available
   - Tooltips display who's available on each date
+- July 06, 2025. Fixed calendar issues:
+  - Fixed duplicate calendar display by restricting to specific message content
+  - Fixed timezone issues causing wrong date selection (now using UTC noon)
+  - Added optimistic updates for immediate UI feedback on date clicks
+  - Improved date comparison logic to handle timezone differences properly
 
 ## User Preferences
 
