@@ -1,4 +1,4 @@
-import { Bot, User, LocationEdit } from "lucide-react";
+import { Bot, User, MapPin } from "lucide-react";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import CalendarMatrix from "./CalendarMatrix";
@@ -73,7 +73,7 @@ export default function ChatMessage({
       <div className="flex justify-center">
         <div className="bg-white rounded-2xl p-4 shadow-sm max-w-md text-center">
           <div className="w-12 h-12 bg-primary rounded-full flex items-center justify-center mx-auto mb-3">
-            <LocationEdit className="w-6 h-6 text-white" />
+            <MapPin className="w-6 h-6 text-white" />
           </div>
           <p className="text-sm text-slate-600 mb-4">{message.content}</p>
           <div className="text-xs text-slate-500">

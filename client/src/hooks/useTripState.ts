@@ -67,7 +67,7 @@ export function useTripState(tripId: string, userId: number) {
         "POST",
         `/api/trips/${tripId}/messages`,
         {
-          userId,
+          user_id: userId,
           type: "user",
           content,
         },
@@ -91,8 +91,8 @@ export function useTripState(tripId: string, userId: number) {
       emoji: string;
     }) => {
       const response = await apiRequest("POST", `/api/trips/${tripId}/votes`, {
-        userId,
-        optionId,
+        user_id: userId,
+        option_id: optionId,
         emoji,
       });
       return response.json();
