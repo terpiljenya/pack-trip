@@ -1,0 +1,69 @@
+PackTrip AI – UI Requirements Document
+
+PackTrip AI – the first group‑travel concierge that hears everyone, negotiates the perfect plan, and books it, all from a single chat
+
+1 Purpose & Scope
+Define the user‑experience and UI components for PackTrip AI, a web app that helps small groups plan and book trips in two stages:
+1. High‑level planning – align travel dates, budget, destination ideas.
+2. Detailed planning – pick concrete flights, lodging, restaurants, and activities; split costs and book. 
+
+2 Design Principles
+* Chat‑first: one continuous conversation thread is the primary surface.
+* Progressive disclosure: start simple; reveal richer controls (calendar, maps, payment) only when relevant.
+* Real‑time collaboration: multiple users can click/vote simultaneously; updates stream live.
+* Mobile‑first, responsive: design at 390 px width; optimise for desktop ≥1024 px.
+* Accessibility: WCAG 2.2 AA contrast, keyboard‑navigable, aria‑labels, colour‑blind‑safe palette.
+
+3 Personas
+Persona	Needs	Devices
+Traveller (Alice, Bob, Carol)	coordinate dates & budget, view options, vote, pay share	phone > laptop
+System Agent	posts cards, polls, reminders	n/a
+4 Information Architecture & Screens
+1. Chat Screen (root)
+    * Message Thread (70 % width desktop, full width mobile)
+    * Context Drawer (30 % width desktop, slid‑over panel mobile) toggles:
+        * Calendar view
+        * Itinerary Board (kanban‑style day columns)
+        * Map Preview (leaflet)
+        * Payment Split ledger
+2. Full‑screen Modals
+    * Date Picker Matrix – group availability grid
+    * Flight Selector – paginated cards
+    * Lodging Selector – gallery grid
+
+5 Interaction Flow
+Stage 1 – High‑level Planning
+1. /start system message creates Trip ID and invites users.
+2. Each user posts a free‑text prompt ("Paris in Oct €1200" etc.).
+3. Calendar Picker Matrix appears; users tap available dates → matrix updates in real time.
+4. Conflict Radar Banner summarises blockers ("Bob unavailable 14‑17 Oct").
+5. Negotiator Agent posts 3 Itinerary Option Cards.
+6. Users tap Quick‑Vote Chips (👍❤️💸) per card.
+7. When ≥80 % consensus on one card → Stage 2 trigger.
+Stage 2 – Detailed Planning
+1. Chat asks for flight/ stay/ food preferences (chips, free text, video paste).
+2. Supplier Agent injects:
+    * Flight Option Cards (accordion list)
+    * Stay Option Cards (map pin + photo)
+    * Eat Option Cards (thumbnail + tags)
+3. For each category, users vote; top‑scoring option locks in.
+4. Payment Split Widget appears; Stripe test links generated.
+5. When all payments complete → show Celebration Confetti + “Trip locked!” banner.
+
+6 UI Component Reference
+ID	Component	Props / Notes
+C‑01	ChatMessage	author, content, timestamp, type (user/agent/system)
+C‑02	QuickVoteChips	icon list [👍,❤️,💸], onSelect(optionId, emoji)
+C‑03	CalendarMatrix	dates[][], availability[userId][date], onToggle(date)
+C‑04	ConflictBanner	issues[], severity colour ramps
+C‑05	ItineraryCard	day, activities[], cost, scorePerUser{}
+C‑06	OptionCard (Flight/Stay/Eat)	image, title, price, tags, CTA buttons
+C‑07	MapPreview	lat, lng, pins[]
+C‑08	PaymentSplitLedger	items[], shares{userId:amount}, status{}
+C‑09	StickerReply	mini‑emoji reactions in chat
+C‑10	UploadDropzone	accepts video link or file, returns transcript tokens
+Design tokens: primary #2864FF, success #00C48C, warn #FFB547, danger #FF5B5B; fonts Inter, rounded corners 1rem; shadow 0 0 8px rgba(0,0,0,.06).
+
+7 State Machine (high‑level)
+INIT ➜ COLLECTING_PREFS ➜ COLLECTING_DATES ➜ GENERATING_HIGH_OPTIONS ➜ VOTING_HIGH_LEVEL ➜ ITINERARY_LOCKED ➜ GENERATING_DETAIL_OPTIONS ➜ VOTING_DETAIL ➜ READY_TO_BOOK ➜ BOOKED
+Each component listens to the global tripState context and renders only when active.
