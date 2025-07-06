@@ -81,7 +81,7 @@ export function useTripState(tripId: string, userId: number) {
     },
   });
 
-  // Vote mutation
+  // Vote mutation with optimistic update
   const voteMutation = useMutation({
     mutationFn: async ({
       optionId,
@@ -97,7 +97,51 @@ export function useTripState(tripId: string, userId: number) {
       });
       return response.json();
     },
-    onSuccess: () => {
+    onMutate: async ({ optionId, emoji }) => {
+      // Cancel any outgoing refetches
+      await queryClient.cancelQueries({
+        queryKey: [`/api/trips/${tripId}/votes`],
+      });
+
+      // Snapshot the previous value
+      const previousVotes = queryClient.getQueryData([`/api/trips/${tripId}/votes`]);
+
+      // Optimistically update by toggling the vote
+      queryClient.setQueryData([`/api/trips/${tripId}/votes`], (old: any) => {
+        if (!old) return old;
+        
+        // Check if vote already exists
+        const existingVoteIndex = old.findIndex(
+          (v: any) => v.user_id === userId && v.option_id === optionId && v.emoji === emoji
+        );
+
+        if (existingVoteIndex >= 0) {
+          // Remove the vote (unvote)
+          return old.filter((_: any, index: number) => index !== existingVoteIndex);
+        } else {
+          // Add the vote
+          return [...old, {
+            id: Date.now(), // Temporary ID
+            trip_id: tripId,
+            user_id: userId,
+            option_id: optionId,
+            emoji,
+            timestamp: new Date().toISOString(),
+          }];
+        }
+      });
+
+      // Return a context object with the snapshotted value
+      return { previousVotes };
+    },
+    onError: (err, variables, context) => {
+      // If the mutation fails, use the context returned from onMutate to roll back
+      if (context?.previousVotes) {
+        queryClient.setQueryData([`/api/trips/${tripId}/votes`], context.previousVotes);
+      }
+    },
+    onSettled: () => {
+      // Always refetch after error or success
       queryClient.invalidateQueries({
         queryKey: [`/api/trips/${tripId}/votes`],
       });

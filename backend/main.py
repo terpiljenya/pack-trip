@@ -199,30 +199,54 @@ async def get_votes(trip_id: str, db: Session = Depends(get_db)):
     return votes
 
 
-@app.post("/api/trips/{trip_id}/votes", response_model=schemas.Vote)
+@app.post("/api/trips/{trip_id}/votes")
 async def create_vote(trip_id: str,
                       vote: schemas.VoteCreate,
                       db: Session = Depends(get_db)):
-    # Remove existing vote for this user/option combination
-    db.query(Vote).filter(Vote.trip_id == trip_id,
-                          Vote.user_id == vote.user_id,
-                          Vote.option_id == vote.option_id).delete()
+    # Check if vote already exists
+    existing_vote = db.query(Vote).filter(
+        Vote.trip_id == trip_id,
+        Vote.user_id == vote.user_id,
+        Vote.option_id == vote.option_id,
+        Vote.emoji == vote.emoji
+    ).first()
 
-    # Add new vote
-    db_vote = Vote(trip_id=trip_id, **vote.dict())
-    db.add(db_vote)
-    db.commit()
-    db.refresh(db_vote)
+    if existing_vote:
+        # Vote exists, remove it (unvote)
+        db.delete(existing_vote)
+        db.commit()
+        
+        # Broadcast vote removal
+        await manager.broadcast_to_trip(
+            trip_id, {
+                "type": "vote_update",
+                "action": "removed",
+                "vote": {
+                    "user_id": vote.user_id,
+                    "option_id": vote.option_id,
+                    "emoji": vote.emoji
+                },
+                "timestamp": datetime.utcnow().isoformat()
+            })
+        
+        return {"action": "removed", "message": "Vote removed"}
+    else:
+        # Vote doesn't exist, add it
+        db_vote = Vote(trip_id=trip_id, **vote.dict())
+        db.add(db_vote)
+        db.commit()
+        db.refresh(db_vote)
 
-    # Broadcast vote update
-    await manager.broadcast_to_trip(
-        trip_id, {
-            "type": "vote_update",
-            "vote": schemas.Vote.from_orm(db_vote).dict(),
-            "timestamp": datetime.utcnow().isoformat()
-        })
+        # Broadcast vote addition
+        await manager.broadcast_to_trip(
+            trip_id, {
+                "type": "vote_update",
+                "action": "added",
+                "vote": schemas.Vote.from_orm(db_vote).dict(),
+                "timestamp": datetime.utcnow().isoformat()
+            })
 
-    return db_vote
+        return schemas.Vote.from_orm(db_vote)
 
 
 @app.get("/api/trips/{trip_id}/options",
