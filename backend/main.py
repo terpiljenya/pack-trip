@@ -664,6 +664,40 @@ async def set_preferences(
         "type": "new_message",
         "timestamp": datetime.utcnow().isoformat()
     })
+    
+    # Check if all participants have submitted preferences
+    trip = db.query(Trip).filter(Trip.trip_id == trip_id).first()
+    all_participants = db.query(TripParticipant).filter(
+        TripParticipant.trip_id == trip_id).all()
+    participants_with_prefs = db.query(TripParticipant).filter(
+        TripParticipant.trip_id == trip_id,
+        TripParticipant.has_submitted_preferences == True).count()
+    
+    # If all participants have submitted preferences and we're in INIT state, move to COLLECTING_DATES
+    if trip and trip.state == "INIT" and participants_with_prefs == len(all_participants):
+        trip.state = "COLLECTING_DATES"
+        
+        # Add the date collection message
+        date_message = Message(
+            trip_id=trip_id,
+            user_id=None,
+            type="agent",
+            content="Perfect! I now have everyone's preferences. Let's coordinate your dates - I need everyone to mark their availability on the calendar below. Click on the dates you're available to travel!"
+        )
+        db.add(date_message)
+        db.commit()
+        
+        # Broadcast state change and new message
+        await manager.broadcast_to_trip(trip_id, {
+            "type": "state_changed",
+            "state": "COLLECTING_DATES",
+            "timestamp": datetime.utcnow().isoformat()
+        })
+        
+        await manager.broadcast_to_trip(trip_id, {
+            "type": "new_message",
+            "timestamp": datetime.utcnow().isoformat()
+        })
 
     if existing:
         return existing
@@ -867,32 +901,29 @@ async def reset_carol(request: dict, db: Session = Depends(get_db)):
         raise HTTPException(status_code=403,
                             detail="Can only reset Carol's data")
 
-    # Delete Carol's preferences
+    # Delete ALL preferences for this trip
     db.query(UserPreferences).filter(
-        UserPreferences.user_id == user_id,
         UserPreferences.trip_id == trip_id).delete()
 
-    # Delete Carol's availability
+    # Delete ALL availability for this trip
     db.query(DateAvailability).filter(
-        DateAvailability.user_id == user_id,
         DateAvailability.trip_id == trip_id).delete()
 
     # Delete ALL messages for this trip to reset chat completely
     db.query(Message).filter(Message.trip_id == trip_id).delete()
+    
+    # Delete ALL votes for this trip
+    db.query(Vote).filter(Vote.trip_id == trip_id).delete()
 
-    # Update Carol's participant status
-    participant = db.query(TripParticipant).filter(
-        TripParticipant.user_id == user_id,
-        TripParticipant.trip_id == trip_id).first()
+    # Reset ALL participants' status
+    db.query(TripParticipant).filter(
+        TripParticipant.trip_id == trip_id).update({
+            "has_submitted_preferences": False,
+            "has_submitted_availability": False
+        })
 
-    if participant:
-        participant.has_submitted_preferences = False
-        participant.has_submitted_availability = False
-
-    # Reset trip state to COLLECTING_DATES if it was in voting
-    trip = db.query(Trip).filter(Trip.trip_id == trip_id).first()
-    if trip and trip.state == "VOTING_HIGH_LEVEL":
-        trip.state = "COLLECTING_DATES"
+    # Reset trip state to INIT (initial state)
+    db.query(Trip).filter(Trip.trip_id == trip_id).update({"state": "INIT"})
 
     # Delete all trip options
     db.query(TripOption).filter(TripOption.trip_id == trip_id).delete()
