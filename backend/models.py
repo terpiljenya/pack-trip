@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Text, DateTime, Boolean, ForeignKey, JSON
+from sqlalchemy import Column, Integer, String, Text, JSON, DateTime, ForeignKey, Boolean, Float
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship
 from datetime import datetime
@@ -20,6 +20,7 @@ class User(Base):
     participations = relationship("TripParticipant", back_populates="user")
     votes = relationship("Vote", back_populates="user")
     availability = relationship("DateAvailability", back_populates="user")
+    preferences = relationship("UserPreferences", back_populates="user", uselist=False)
 
 class Trip(Base):
     __tablename__ = "trips"
@@ -51,6 +52,8 @@ class TripParticipant(Base):
     role = Column(String, nullable=False, default="traveler")
     is_online = Column(Boolean, default=False)
     joined_at = Column(DateTime, default=datetime.utcnow)
+    has_submitted_preferences = Column(Boolean, default=False)
+    has_submitted_availability = Column(Boolean, default=False)
     
     # Relationships
     trip = relationship("Trip", back_populates="participants")
@@ -70,6 +73,23 @@ class Message(Base):
     # Relationships
     trip = relationship("Trip", back_populates="messages")
     user = relationship("User", back_populates="messages")
+
+class UserPreferences(Base):
+    __tablename__ = "user_preferences"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, unique=True)
+    trip_id = Column(String, ForeignKey("trips.trip_id"), nullable=False)
+    budget_preference = Column(String, nullable=True)  # low, medium, high
+    accommodation_type = Column(String, nullable=True)  # hotel, hostel, airbnb
+    travel_style = Column(String, nullable=True)  # adventure, cultural, relaxing
+    activities = Column(JSON, nullable=True)  # array of activities
+    dietary_restrictions = Column(String, nullable=True)
+    special_requirements = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    
+    # Relationships
+    user = relationship("User", back_populates="preferences")
 
 class DateAvailability(Base):
     __tablename__ = "date_availability"

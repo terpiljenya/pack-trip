@@ -1,7 +1,7 @@
 import { useParams } from 'wouter';
 import { useTripState } from '@/hooks/useTripState';
 import { useIsMobile } from '@/hooks/use-mobile';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Plane, Users, Calendar, MapPin, Menu, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
@@ -9,15 +9,28 @@ import { Badge } from '@/components/ui/badge';
 import ChatMessage from '@/components/chat/ChatMessage';
 import MessageInput from '@/components/chat/MessageInput';
 import ContextDrawer from '@/components/chat/ContextDrawer';
+import PreferencesDialog from '@/components/chat/PreferencesDialog';
+import { useToast } from '@/hooks/use-toast';
 
 export default function ChatPage() {
   const params = useParams();
   const tripId = params.tripId || 'BCN-2024-001';
-  const userId = 1; // TODO: Get from auth context
+  const userId = 3; // Simulating Carol as the new user
   const isMobile = useIsMobile();
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+  const [showPreferencesDialog, setShowPreferencesDialog] = useState(false);
+  const { toast } = useToast();
   
-  const { tripContext, sendMessage, vote, setAvailability, isConnected } = useTripState(tripId, userId);
+  const { 
+    tripContext, 
+    sendMessage, 
+    vote, 
+    setAvailability, 
+    setPreferences,
+    preferences,
+    missingPreferences,
+    isConnected 
+  } = useTripState(tripId, userId);
 
   const getStateDisplay = (state: string) => {
     switch (state) {
@@ -34,6 +47,37 @@ export default function ChatPage() {
 
   const stateDisplay = getStateDisplay(tripContext.state);
   const onlineParticipants = tripContext.participants.filter(p => p.isOnline);
+
+  // Check if current user needs to submit preferences
+  useEffect(() => {
+    if (missingPreferences?.missing_preferences) {
+      const userNeedsPreferences = missingPreferences.missing_preferences.some(
+        (user: any) => user.user_id === userId
+      );
+      if (userNeedsPreferences && !preferences) {
+        setShowPreferencesDialog(true);
+      }
+    }
+  }, [missingPreferences, preferences, userId]);
+
+  const handlePreferencesSubmit = async (data: any) => {
+    try {
+      setPreferences(data);
+      toast({
+        title: "Preferences saved!",
+        description: "Your travel preferences have been recorded.",
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to save preferences. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const currentUser = tripContext.participants.find(p => p.userId === userId);
+  const userName = currentUser?.displayName || 'Traveler';
 
   return (
     <div className="h-screen flex flex-col lg:flex-row bg-slate-50">
@@ -148,6 +192,14 @@ export default function ChatPage() {
           />
         </div>
       )}
+
+      {/* Preferences Dialog */}
+      <PreferencesDialog
+        open={showPreferencesDialog}
+        onOpenChange={setShowPreferencesDialog}
+        onSubmit={handlePreferencesSubmit}
+        userName={userName}
+      />
     </div>
   );
 }

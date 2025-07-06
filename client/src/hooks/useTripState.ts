@@ -44,6 +44,18 @@ export function useTripState(tripId: string, userId: number) {
     enabled: !!tripId
   });
 
+  // Fetch user preferences
+  const { data: preferences } = useQuery({
+    queryKey: [`/api/trips/${tripId}/preferences/${userId}`],
+    enabled: !!tripId && !!userId
+  });
+
+  // Check missing preferences
+  const { data: missingPreferences } = useQuery({
+    queryKey: [`/api/trips/${tripId}/missing-preferences`],
+    enabled: !!tripId
+  });
+
   // Send message mutation
   const sendMessageMutation = useMutation({
     mutationFn: async (content: string) => {
@@ -89,6 +101,20 @@ export function useTripState(tripId: string, userId: number) {
     }
   });
 
+  // Set preferences mutation
+  const setPreferencesMutation = useMutation({
+    mutationFn: async (preferences: any) => {
+      const response = await apiRequest('POST', `/api/trips/${tripId}/preferences?user_id=${userId}`, preferences);
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [`/api/trips/${tripId}/preferences/${userId}`] });
+      queryClient.invalidateQueries({ queryKey: [`/api/trips/${tripId}/missing-preferences`] });
+      queryClient.invalidateQueries({ queryKey: [`/api/trips/${tripId}/messages`] });
+      queryClient.invalidateQueries({ queryKey: [`/api/trips/${tripId}/participants`] });
+    }
+  });
+
   // Handle WebSocket messages
   useEffect(() => {
     wsMessages.forEach((message: WebSocketMessage) => {
@@ -104,6 +130,10 @@ export function useTripState(tripId: string, userId: number) {
           break;
         case 'user_joined':
         case 'user_left':
+          queryClient.invalidateQueries({ queryKey: [`/api/trips/${tripId}/participants`] });
+          break;
+        case 'preferences_update':
+          queryClient.invalidateQueries({ queryKey: [`/api/trips/${tripId}/missing-preferences`] });
           queryClient.invalidateQueries({ queryKey: [`/api/trips/${tripId}/participants`] });
           break;
       }
@@ -147,7 +177,10 @@ export function useTripState(tripId: string, userId: number) {
     sendMessage: sendMessageMutation.mutate,
     vote: voteMutation.mutate,
     setAvailability: setAvailabilityMutation.mutate,
+    setPreferences: setPreferencesMutation.mutate,
+    preferences,
+    missingPreferences,
     isConnected,
-    isLoading: sendMessageMutation.isPending || voteMutation.isPending || setAvailabilityMutation.isPending
+    isLoading: sendMessageMutation.isPending || voteMutation.isPending || setAvailabilityMutation.isPending || setPreferencesMutation.isPending
   };
 }

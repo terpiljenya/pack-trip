@@ -18,6 +18,27 @@ class User(UserBase):
     class Config:
         from_attributes = True
 
+# User preferences schemas
+class UserPreferencesBase(BaseModel):
+    budget_preference: Optional[str] = None
+    accommodation_type: Optional[str] = None
+    travel_style: Optional[str] = None
+    activities: Optional[List[str]] = None
+    dietary_restrictions: Optional[str] = None
+    special_requirements: Optional[str] = None
+
+class UserPreferencesCreate(UserPreferencesBase):
+    pass
+
+class UserPreferences(UserPreferencesBase):
+    id: int
+    user_id: int
+    trip_id: str
+    created_at: datetime
+    
+    class Config:
+        from_attributes = True
+
 # Trip schemas
 class TripBase(BaseModel):
     trip_id: str
@@ -47,6 +68,8 @@ class TripParticipant(BaseModel):
     role: str
     is_online: bool
     joined_at: datetime
+    has_submitted_preferences: bool
+    has_submitted_availability: bool
     user: Optional[User] = None
     
     class Config:

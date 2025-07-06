@@ -11,7 +11,7 @@ import os
 from pathlib import Path
 
 from .database import get_db, engine
-from .models import Base, User, Trip, TripParticipant, Message, Vote, TripOption, DateAvailability
+from .models import Base, User, Trip, TripParticipant, Message, Vote, TripOption, DateAvailability, UserPreferences
 from . import schemas
 
 # Create all tables
@@ -300,6 +300,115 @@ async def get_availability(trip_id: str, db: Session = Depends(get_db)):
     ).all()
     return availability
 
+@app.post("/api/trips/{trip_id}/preferences", response_model=schemas.UserPreferences)
+async def set_preferences(
+    trip_id: str,
+    preferences: schemas.UserPreferencesCreate,
+    user_id: int,  # In production, get from auth
+    db: Session = Depends(get_db)
+):
+    # Check if preferences already exist
+    existing = db.query(UserPreferences).filter(
+        UserPreferences.user_id == user_id,
+        UserPreferences.trip_id == trip_id
+    ).first()
+    
+    if existing:
+        # Update existing preferences
+        for key, value in preferences.dict().items():
+            setattr(existing, key, value)
+    else:
+        # Create new preferences
+        db_preferences = UserPreferences(
+            user_id=user_id,
+            trip_id=trip_id,
+            **preferences.dict()
+        )
+        db.add(db_preferences)
+    
+    # Update participant status
+    participant = db.query(TripParticipant).filter(
+        TripParticipant.trip_id == trip_id,
+        TripParticipant.user_id == user_id
+    ).first()
+    
+    if participant:
+        participant.has_submitted_preferences = True
+    
+    db.commit()
+    
+    # Broadcast preferences update
+    await manager.broadcast_to_trip(trip_id, {
+        "type": "preferences_update",
+        "user_id": user_id,
+        "timestamp": datetime.utcnow().isoformat()
+    })
+    
+    # Generate AI context message
+    user = db.query(User).filter(User.id == user_id).first()
+    preferences_text = f"{user.display_name} has shared their preferences:\n"
+    preferences_text += f"• Budget: {preferences.budget_preference}\n"
+    preferences_text += f"• Accommodation: {preferences.accommodation_type}\n"
+    preferences_text += f"• Travel style: {preferences.travel_style}\n"
+    if preferences.activities:
+        preferences_text += f"• Activities: {', '.join(preferences.activities)}\n"
+    if preferences.dietary_restrictions:
+        preferences_text += f"• Dietary: {preferences.dietary_restrictions}\n"
+    if preferences.special_requirements:
+        preferences_text += f"• Special needs: {preferences.special_requirements}"
+    
+    # Add system message
+    system_message = Message(
+        trip_id=trip_id,
+        user_id=None,
+        type="system",
+        content=preferences_text
+    )
+    db.add(system_message)
+    db.commit()
+    
+    # Broadcast new message
+    await manager.broadcast_to_trip(trip_id, {
+        "type": "new_message",
+        "timestamp": datetime.utcnow().isoformat()
+    })
+    
+    if existing:
+        return existing
+    else:
+        db.refresh(db_preferences)
+        return db_preferences
+
+@app.get("/api/trips/{trip_id}/preferences/{user_id}", response_model=schemas.UserPreferences)
+async def get_preferences(trip_id: str, user_id: int, db: Session = Depends(get_db)):
+    preferences = db.query(UserPreferences).filter(
+        UserPreferences.trip_id == trip_id,
+        UserPreferences.user_id == user_id
+    ).first()
+    
+    if not preferences:
+        raise HTTPException(status_code=404, detail="Preferences not found")
+    
+    return preferences
+
+@app.get("/api/trips/{trip_id}/missing-preferences")
+async def get_missing_preferences(trip_id: str, db: Session = Depends(get_db)):
+    participants = db.query(TripParticipant).filter(
+        TripParticipant.trip_id == trip_id,
+        TripParticipant.has_submitted_preferences == False
+    ).all()
+    
+    missing_users = []
+    for participant in participants:
+        user = db.query(User).filter(User.id == participant.user_id).first()
+        if user:
+            missing_users.append({
+                "user_id": user.id,
+                "display_name": user.display_name
+            })
+    
+    return {"missing_preferences": missing_users}
+
 # Initialize demo data on startup
 @app.on_event("startup")
 async def startup_event():
@@ -331,15 +440,43 @@ async def startup_event():
     db.add(demo_trip)
     db.commit()
     
-    # Add participants
+    # Add participants - Alice and Bob have submitted preferences, Carol hasn't
     participants = [
-        TripParticipant(trip_id="BCN-2024-001", user_id=1, role="organizer"),
-        TripParticipant(trip_id="BCN-2024-001", user_id=2, role="traveler"),
-        TripParticipant(trip_id="BCN-2024-001", user_id=3, role="traveler")
+        TripParticipant(trip_id="BCN-2024-001", user_id=1, role="organizer", has_submitted_preferences=True),
+        TripParticipant(trip_id="BCN-2024-001", user_id=2, role="traveler", has_submitted_preferences=True),
+        TripParticipant(trip_id="BCN-2024-001", user_id=3, role="traveler", has_submitted_preferences=False)
     ]
     
     for participant in participants:
         db.add(participant)
+    db.commit()
+    
+    # Add preferences for Alice and Bob
+    preferences = [
+        UserPreferences(
+            user_id=1,
+            trip_id="BCN-2024-001",
+            budget_preference="medium",
+            accommodation_type="hotel",
+            travel_style="cultural",
+            activities=["sightseeing", "museums", "food", "shopping"],
+            dietary_restrictions="Vegetarian",
+            special_requirements="Quiet rooms preferred"
+        ),
+        UserPreferences(
+            user_id=2,
+            trip_id="BCN-2024-001",
+            budget_preference="medium",
+            accommodation_type="hotel", 
+            travel_style="adventure",
+            activities=["beach", "outdoors", "nightlife", "food"],
+            dietary_restrictions=None,
+            special_requirements="Close to nightlife areas"
+        )
+    ]
+    
+    for pref in preferences:
+        db.add(pref)
     db.commit()
     
     # Add initial messages
@@ -368,6 +505,24 @@ async def startup_event():
             user_id=None,
             type="agent",
             content="Excellent! Barcelona in October is a fantastic choice. Now let's coordinate your dates - I need everyone to mark their availability on the calendar below. Click on the dates you're available to travel!"
+        ),
+        Message(
+            trip_id="BCN-2024-001",
+            user_id=None,
+            type="system",
+            content="Alice Johnson has shared their preferences:\n• Budget: medium\n• Accommodation: hotel\n• Travel style: cultural\n• Activities: sightseeing, museums, food tours, shopping\n• Dietary: Vegetarian\n• Special needs: Quiet rooms preferred"
+        ),
+        Message(
+            trip_id="BCN-2024-001",
+            user_id=None,
+            type="system",
+            content="Bob Smith has shared their preferences:\n• Budget: medium\n• Accommodation: hotel\n• Travel style: adventure\n• Activities: beach, outdoor activities, nightlife, food tours\n• Special needs: Close to nightlife areas"
+        ),
+        Message(
+            trip_id="BCN-2024-001",
+            user_id=None,
+            type="agent",
+            content="Great! I have Alice and Bob's preferences. Carol, when you join, please share your travel preferences so I can create the perfect trip for everyone!"
         )
     ]
     
