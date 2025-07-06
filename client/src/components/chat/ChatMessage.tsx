@@ -4,12 +4,13 @@ import { Badge } from "@/components/ui/badge";
 import CalendarMatrix from "./CalendarMatrix";
 import ConflictBanner from "./ConflictBanner";
 import ItineraryCard from "./ItineraryCard";
+import DetailedPlanCard from "./DetailedPlanCard";
 
 interface ChatMessageProps {
   message: {
     id: number;
     userId: number | null;
-    type: "user" | "agent" | "system";
+    type: "user" | "agent" | "system" | "detailed_plan";
     content: string;
     timestamp: Date;
     metadata?: any;
@@ -81,6 +82,31 @@ export default function ChatMessage({
               <User className="w-3 h-3 mr-1" />
               Trip ID: BCN-2024-001
             </span>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Handle detailed plan messages
+  if (message.type === "detailed_plan" && message.metadata) {
+    return (
+      <div className="flex items-start space-x-3">
+        <Avatar className="w-8 h-8">
+          <AvatarFallback className="bg-emerald-600 text-white">
+            <Bot className="w-4 h-4" />
+          </AvatarFallback>
+        </Avatar>
+        <div className="flex-1">
+          <div className="flex items-center space-x-2 mb-1">
+            <span className="font-medium text-slate-900">PackTrip AI</span>
+            <span className="text-xs text-slate-500">
+              {message.timestamp.toLocaleTimeString()}
+            </span>
+          </div>
+          <div className="mb-4">
+            <p className="text-slate-800 mb-4">{message.content}</p>
+            <DetailedPlanCard planData={message.metadata} />
           </div>
         </div>
       </div>

@@ -14,6 +14,18 @@ from .database import get_db, engine
 from .models import Base, User, Trip, TripParticipant, Message, Vote, TripOption, DateAvailability, UserPreferences
 from . import schemas
 
+# OpenAI integration
+import openai
+from openai import OpenAI
+
+# Initialize OpenAI client
+openai_client = OpenAI(
+    api_key=os.environ.get("OPENAI_API_KEY")
+)
+
+# Initialize OpenAI client
+openai_client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+
 # Create all tables
 Base.metadata.create_all(bind=engine)
 
@@ -246,7 +258,284 @@ async def create_vote(trip_id: str,
                 "timestamp": datetime.utcnow().isoformat()
             })
 
+        # Check for consensus after adding vote
+        await check_voting_consensus(trip_id, db)
+
         return schemas.Vote.from_orm(db_vote)
+
+
+async def check_voting_consensus(trip_id: str, db: Session):
+    """Check if voting consensus has been reached and generate detailed plan if so."""
+    # Get all participants and votes
+    participants = db.query(TripParticipant).filter(TripParticipant.trip_id == trip_id).all()
+    votes = db.query(Vote).filter(Vote.trip_id == trip_id, Vote.emoji == "👍").all()
+    options = db.query(TripOption).filter(TripOption.trip_id == trip_id).all()
+    
+    if not participants or not votes or not options:
+        return
+    
+    # Group votes by option
+    votes_by_option = {}
+    for vote in votes:
+        if vote.option_id not in votes_by_option:
+            votes_by_option[vote.option_id] = []
+        votes_by_option[vote.option_id].append(vote)
+    
+    # Check if any option has 100% consensus
+    total_participants = len(participants)
+    winning_option = None
+    
+    for option_id, option_votes in votes_by_option.items():
+        unique_voters = set(vote.user_id for vote in option_votes)
+        if len(unique_voters) == total_participants:
+            winning_option = next((opt for opt in options if opt.option_id == option_id), None)
+            break
+    
+    if winning_option:
+        # Check if detailed plan already exists
+        existing_plan = db.query(Message).filter(
+            Message.trip_id == trip_id,
+            Message.type == "detailed_plan"
+        ).first()
+        
+        if not existing_plan:
+            # Generate detailed plan
+            await generate_detailed_trip_plan(trip_id, winning_option, db)
+
+
+async def generate_detailed_trip_plan(trip_id: str, winning_option: TripOption, db: Session):
+    """Generate detailed trip plan using OpenAI for the winning option."""
+    try:
+        # Get trip details
+        trip = db.query(Trip).filter(Trip.trip_id == trip_id).first()
+        if not trip:
+            return
+        
+        # Get user preferences for context
+        preferences = db.query(UserPreferences).filter(UserPreferences.trip_id == trip_id).all()
+        
+        # Build context for AI
+        context = {
+            "destination": trip.destination or "Barcelona",
+            "title": winning_option.title,
+            "description": winning_option.description,
+            "budget": trip.budget,
+            "preferences": [
+                {
+                    "budget_preference": pref.budget_preference,
+                    "accommodation_type": pref.accommodation_type,
+                    "travel_style": pref.travel_style,
+                    "activities": pref.activities,
+                    "dietary_restrictions": pref.dietary_restrictions
+                }
+                for pref in preferences
+            ]
+        }
+        
+        # the newest OpenAI model is "gpt-4o" which was released May 13, 2024. do not change this unless explicitly requested by the user
+        if openai_client.api_key:
+            response = openai_client.chat.completions.create(
+                model="gpt-4o",
+                messages=[
+                    {
+                        "role": "system",
+                        "content": """You are a professional travel planner creating detailed day-by-day itineraries. 
+                        Create a comprehensive 3-day trip plan with specific restaurants, activities, and timing.
+                        Include exact addresses, opening hours, and estimated costs where possible.
+                        Format the response as JSON with this structure:
+                        {
+                            "title": "Final Trip Plan: [Title]",
+                            "summary": "Brief overview",
+                            "days": [
+                                {
+                                    "day": 1,
+                                    "title": "Day 1: [Theme]",
+                                    "activities": [
+                                        {
+                                            "time": "9:00 AM",
+                                            "activity": "Activity name",
+                                            "location": "Specific address",
+                                            "description": "What to expect",
+                                            "cost": "$20-30",
+                                            "duration": "2 hours"
+                                        }
+                                    ]
+                                }
+                            ],
+                            "practical_info": {
+                                "total_estimated_cost": "$400-500",
+                                "transportation": "Metro and walking",
+                                "booking_notes": "Book restaurants in advance"
+                            }
+                        }"""
+                    },
+                    {
+                        "role": "user",
+                        "content": f"""Create a detailed 3-day itinerary for {context['destination']} based on:
+                        - Theme: {context['title']}
+                        - Description: {context['description']}
+                        - Budget: {context.get('budget', 'Moderate')}
+                        - Preferences: {context['preferences']}
+                        
+                        Focus on specific, bookable venues and activities with real addresses and timing."""
+                    }
+                ],
+                response_format={"type": "json_object"},
+                max_tokens=2000
+            )
+            detailed_plan = json.loads(response.choices[0].message.content or "{}")
+        else:
+            # Mock detailed plan for testing when no API key is available
+            detailed_plan = {
+                "title": f"Final Trip Plan: {context['title']}",
+                "summary": f"A comprehensive 3-day {context['title'].lower()} experience in {context['destination']} designed to showcase the best of local culture, cuisine, and attractions.",
+                "days": [
+                    {
+                        "day": 1,
+                        "title": "Day 1: Historic Discovery",
+                        "activities": [
+                            {
+                                "time": "9:00 AM",
+                                "activity": "Gothic Quarter Walking Tour",
+                                "location": "Plaça de la Seu, Barcelona",
+                                "description": "Explore medieval streets, hidden courtyards, and ancient Roman ruins",
+                                "cost": "€15-25",
+                                "duration": "3 hours"
+                            },
+                            {
+                                "time": "1:00 PM",
+                                "activity": "Lunch at Cal Pep",
+                                "location": "Plaça de les Olles, 8, Barcelona",
+                                "description": "Iconic tapas bar with fresh seafood and traditional Catalan dishes",
+                                "cost": "€25-35",
+                                "duration": "1.5 hours"
+                            },
+                            {
+                                "time": "3:30 PM",
+                                "activity": "Picasso Museum",
+                                "location": "Carrer Montcada, 15-23, Barcelona",
+                                "description": "World's most extensive collection of Pablo Picasso's early works",
+                                "cost": "€12",
+                                "duration": "2 hours"
+                            },
+                            {
+                                "time": "8:00 PM",
+                                "activity": "Dinner at Disfrutar",
+                                "location": "Carrer de Villarroel, 163, Barcelona",
+                                "description": "Michelin-starred modern Mediterranean cuisine",
+                                "cost": "€150-200",
+                                "duration": "3 hours"
+                            }
+                        ]
+                    },
+                    {
+                        "day": 2,
+                        "title": "Day 2: Gaudí & Modernism",
+                        "activities": [
+                            {
+                                "time": "9:00 AM",
+                                "activity": "Sagrada Família Tour",
+                                "location": "Carrer de Mallorca, 401, Barcelona",
+                                "description": "Gaudí's masterpiece basilica with tower access",
+                                "cost": "€26-33",
+                                "duration": "2.5 hours"
+                            },
+                            {
+                                "time": "12:00 PM",
+                                "activity": "Park Güell",
+                                "location": "Carrer d'Olot, s/n, Barcelona",
+                                "description": "Gaudí's whimsical park with mosaic art and city views",
+                                "cost": "€10",
+                                "duration": "2 hours"
+                            },
+                            {
+                                "time": "3:00 PM",
+                                "activity": "Casa Batlló",
+                                "location": "Passeig de Gràcia, 43, Barcelona",
+                                "description": "Gaudí's fantastical house with immersive AR experience",
+                                "cost": "€35",
+                                "duration": "1.5 hours"
+                            },
+                            {
+                                "time": "7:00 PM",
+                                "activity": "Cocktails at Paradiso",
+                                "location": "Carrer de Rera Palau, 4, Barcelona",
+                                "description": "Hidden speakeasy behind a pastrami bar",
+                                "cost": "€12-15 per drink",
+                                "duration": "2 hours"
+                            }
+                        ]
+                    },
+                    {
+                        "day": 3,
+                        "title": "Day 3: Beach & Markets",
+                        "activities": [
+                            {
+                                "time": "9:00 AM",
+                                "activity": "La Boquería Market",
+                                "location": "La Rambla, 91, Barcelona",
+                                "description": "Famous food market with fresh produce and local delicacies",
+                                "cost": "€10-15",
+                                "duration": "1.5 hours"
+                            },
+                            {
+                                "time": "11:00 AM",
+                                "activity": "Barceloneta Beach",
+                                "location": "Platja de la Barceloneta, Barcelona",
+                                "description": "Relax on Barcelona's main city beach with chiringuito lunch",
+                                "cost": "€20-30",
+                                "duration": "4 hours"
+                            },
+                            {
+                                "time": "4:00 PM",
+                                "activity": "Cable Car to Montjuïc",
+                                "location": "Av. Miramar, 30, Barcelona",
+                                "description": "Scenic cable car ride with panoramic city views",
+                                "cost": "€13",
+                                "duration": "1 hour"
+                            },
+                            {
+                                "time": "7:30 PM",
+                                "activity": "Sunset at Bunkers del Carmel",
+                                "location": "Carrer de Marià Labèrnia, s/n, Barcelona",
+                                "description": "Best sunset views in Barcelona from former anti-aircraft bunkers",
+                                "cost": "Free",
+                                "duration": "2 hours"
+                            }
+                        ]
+                    }
+                ],
+                "practical_info": {
+                    "total_estimated_cost": "€400-600 per person",
+                    "transportation": "Metro day passes (€10.20), walking, occasional taxi",
+                    "booking_notes": "Reserve Disfrutar 2-3 months ahead. Buy Sagrada Família tickets online. Book Casa Batlló skip-the-line tickets."
+                }
+            }
+        
+        # Save as message
+        db_message = Message(
+            trip_id=trip_id,
+            user_id=None,  # System message
+            type="detailed_plan",
+            content=f"🎉 **{detailed_plan['title']}**\n\n{detailed_plan['summary']}",
+            meta_data=detailed_plan
+        )
+        db.add(db_message)
+        
+        # Update trip state
+        trip.state = "DETAILED_PLAN_READY"
+        db.commit()
+        
+        # Broadcast the new plan
+        await manager.broadcast_to_trip(
+            trip_id, {
+                "type": "detailed_plan_ready",
+                "message": schemas.Message.from_orm(db_message).dict(),
+                "timestamp": datetime.utcnow().isoformat()
+            })
+        
+    except Exception as e:
+        print(f"Error generating detailed plan: {e}")
 
 
 @app.get("/api/trips/{trip_id}/options",
