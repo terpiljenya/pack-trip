@@ -110,13 +110,13 @@ export default function ChatPage() {
           label: "Voting on Options",
           color: "bg-blue-100 text-blue-800",
         };
-      case "ITINERARY_LOCKED":
+      case "HOTELS_FLIGHTS_READY":
         return {
-          label: "Itinerary Locked",
+          label: "Itinerary Ready",
           color: "bg-green-100 text-green-800",
         };
       default:
-        return { label: "Planning", color: "bg-gray-100 text-gray-800" };
+        return { label: state, color: "bg-gray-100 text-gray-800" };
     }
   };
 

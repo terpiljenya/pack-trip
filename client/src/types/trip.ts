@@ -5,10 +5,8 @@ export type TripState =
   | 'GENERATING_HIGH_OPTIONS'
   | 'VOTING_HIGH_LEVEL'
   | 'DETAILED_PLAN_READY'
-  | 'ITINERARY_LOCKED'
   | 'GENERATING_DETAIL_OPTIONS'
-  | 'VOTING_DETAIL'
-  | 'READY_TO_BOOK'
+  | 'HOTELS_FLIGHTS_READY'
   | 'BOOKED';
 
 export interface TripContext {

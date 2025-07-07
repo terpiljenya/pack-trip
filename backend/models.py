@@ -33,7 +33,7 @@ class Trip(Base):
     start_date = Column(DateTime, nullable=True)
     end_date = Column(DateTime, nullable=True)
     budget = Column(Integer, nullable=True)
-    state = Column(String, nullable=False, default="INIT")
+    state = Column(String, nullable=False, default="INIT") 
     invite_token = Column(String, unique=True, nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)

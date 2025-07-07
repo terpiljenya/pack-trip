@@ -5,7 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { TripContext } from '@/types/trip';
+import { TripContext, TripState } from '@/types/trip';
 import { useToast } from '@/hooks/use-toast';
 
 interface ContextDrawerProps {
@@ -24,49 +24,60 @@ interface RoadmapStep {
   current: boolean;
 }
 
+// Defines the order of states in the overall trip lifecycle
+const STATE_ORDER: TripState[] = [
+  'INIT',
+  'COLLECTING_PREFS',
+  'COLLECTING_DATES',
+  'GENERATING_HIGH_OPTIONS',
+  'VOTING_HIGH_LEVEL',
+  'DETAILED_PLAN_READY',
+  'GENERATING_DETAIL_OPTIONS',
+  'HOTELS_FLIGHTS_READY',
+  'BOOKED',
+];
+
 function getRoadmapSteps(tripContext: TripContext): RoadmapStep[] {
-  const state = tripContext.state;
-  // Check for preferences by looking at messages that indicate preference submission
-  const hasPreferences = tripContext.messages.some(m => 
-    m.type === 'system' && m.content.includes('has shared their preferences')
-  );
-  const hasAvailability = tripContext.availability.length > 0;
-  const hasOptions = tripContext.options.length > 0;
-  const hasVotes = tripContext.votes.length > 0;
-  const hasDetailedPlan = state === 'DETAILED_PLAN_READY';
-  
-  return [
+  const stepDefinitions: Array<{ title: string; description: string; state: TripState }> = [
     {
-      title: "Share Travel Preferences",
-      description: "Each traveler shares their budget, travel style, and interests",
-      completed: hasPreferences || state !== 'COLLECTING_DATES',
-      current: state === 'COLLECTING_DATES' && !hasPreferences
+      title: 'Share Travel Preferences',
+      description: 'Each traveler shares their budget, travel style, and interests',
+      state: 'COLLECTING_PREFS',
     },
     {
-      title: "Select Available Dates",
-      description: "Mark dates when everyone can travel on the calendar",
-      completed: hasAvailability,
-      current: state === 'COLLECTING_DATES' && hasPreferences && !hasAvailability
+      title: 'Select Available Dates',
+      description: 'Mark dates when everyone can travel on the calendar',
+      state: 'COLLECTING_DATES',
     },
     {
-      title: "Vote on Favorite Option",
-      description: "Team votes on their preferred trip option",
-      completed: hasVotes && hasDetailedPlan,
-      current: state === 'VOTING_HIGH_LEVEL'
+      title: 'Vote on Favorite Option',
+      description: 'Team votes on their preferred trip option',
+      state: 'VOTING_HIGH_LEVEL',
     },
     {
-      title: "Get Detailed Itinerary",
-      description: "AI creates a detailed day-by-day plan for the chosen option",
-      completed: hasDetailedPlan,
-      current: state === 'DETAILED_PLAN_READY'
+      title: 'Get Detailed Itinerary',
+      description: 'AI creates a detailed day-by-day plan for the chosen option',
+      state: 'DETAILED_PLAN_READY',
     },
     {
-      title: "Book Your Trip",
-      description: "Review final details and proceed to booking",
-      completed: false,
-      current: false
-    }
+      title: 'Book Your Trip',
+      description: 'Review final details and proceed to booking',
+      state: 'HOTELS_FLIGHTS_READY',
+    },
   ];
+
+  const currentStateIndex = STATE_ORDER.indexOf(tripContext.state);
+
+  return stepDefinitions.map((step) => {
+    const stepStateIndex = STATE_ORDER.indexOf(step.state);
+
+    return {
+      title: step.title,
+      description: step.description,
+      completed: stepStateIndex < currentStateIndex,
+      current: step.state === tripContext.state,
+    } as RoadmapStep;
+  });
 }
 
 export default function ContextDrawer({ 
