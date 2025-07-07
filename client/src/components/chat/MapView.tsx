@@ -47,6 +47,23 @@ interface MarkerData {
 
 const DEFAULT_CENTER: [number, number] = [41.3851, 2.1734]; // Barcelona fallback
 
+// Cache for generated number icons to avoid recreating on each render
+const iconCache: Record<number, L.DivIcon> = {};
+
+function getNumberIcon(day: number): L.DivIcon {
+  if (iconCache[day]) return iconCache[day];
+  const size = 30;
+  const icon = new L.DivIcon({
+    html: `<div style="background:#0ea5e9;border:2px solid white;border-radius:50%;width:${size}px;height:${size}px;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:bold;font-size:14px;">${day}</div>`,
+    className: '',
+    iconSize: [size, size],
+    iconAnchor: [size / 2, size],
+    popupAnchor: [0, -size],
+  });
+  iconCache[day] = icon;
+  return icon;
+}
+
 function BoundsHandler({ bounds }: { bounds: LatLngBounds | null }) {
   const map = useMap();
   useEffect(() => {
@@ -131,7 +148,7 @@ export default function MapView({ planData, destination }: MapViewProps) {
         url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
       />
       {markers.map((m, idx) => (
-        <Marker key={idx} position={m.position}>
+        <Marker key={idx} position={m.position} icon={getNumberIcon(m.day)}>
           <Popup>
             <strong>Day {m.day}</strong>
             <br />
