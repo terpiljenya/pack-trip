@@ -40,7 +40,8 @@ class AIAgent:
             "response_needed": bool,
             "calendar_month": Optional[int],
             "calendar_year": Optional[int],
-            "has_preferences": bool
+            "has_preferences": bool,
+            "start_planning": bool
         }
         """
         
@@ -54,13 +55,17 @@ class AIAgent:
             "response_needed": False,
             "calendar_month": intent_analysis.extracted_month,
             "calendar_year": intent_analysis.extracted_year,
-            "has_preferences": False
+            "has_preferences": False,
+            "start_planning": False
         }
         
         # Handle calendar intent
         if intent_analysis.intent == "calendar":
             result["calendar_response"] = await self._generate_calendar_response(message, trip_id, db)
-            result["response_needed"] = True
+            result["response_needed"] = True   
+        elif intent_analysis.intent == "start_planning":
+            # Flag start planning intent so the caller can kick off itinerary generation
+            result["start_planning"] = True
             
         # Extract preferences regardless of intent
         preferences = await self._extract_preferences(message)
@@ -98,6 +103,7 @@ Your task is to identify if the user message contains:
 1. Date/time references (months, seasons, specific dates, "next week", "this summer", etc.)
 2. Travel preferences (budget, activities, accommodation, food, etc.)
 3. General conversation
+4. An explicit request to *start planning* the trip right away (e.g., "let's start planning", "start planning now", "please generate options").
 
 For date extraction:
 - If a month is mentioned, extract the month number (1-12)
@@ -108,7 +114,7 @@ For date extraction:
 - Handle relative dates like "next month", "this summer", "next year"
 
 Return the analysis with:
-- "intent": "calendar" if dates/times are mentioned, "preferences" if preferences are mentioned, "general" otherwise
+- "intent": "calendar" if dates/times are mentioned, "preferences" if preferences are mentioned, "start_planning" if the user is explicitly asking to begin itinerary generation, "general" otherwise
 - "date_mentions": array of any date/time references found
 - "confidence": number between 0-1
 - "extracted_month": month number 1-12 if month is identified, null otherwise
@@ -118,6 +124,7 @@ Examples:
 - "Let's go in September" -> {{"intent": "calendar", "date_mentions": ["September"], "confidence": 0.95, "extracted_month": 9, "extracted_year": {current_date.year if current_date.month < 9 else current_date.year + 1}}}
 - "How about next summer?" -> {{"intent": "calendar", "date_mentions": ["next summer"], "confidence": 0.9, "extracted_month": 7, "extracted_year": {current_date.year + 1}}}
 - "I prefer budget accommodations" -> {{"intent": "preferences", "date_mentions": [], "confidence": 0.9, "extracted_month": null, "extracted_year": null}}
+- "Let's start planning our itinerary" -> {{"intent": "start_planning", "date_mentions": [], "confidence": 0.9, "extracted_month": null, "extracted_year": null}}
 - "How's everyone doing?" -> {{"intent": "general", "date_mentions": [], "confidence": 0.8, "extracted_month": null, "extracted_year": null}}"""
                     },
                     {

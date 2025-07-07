@@ -596,6 +596,10 @@ async def create_message(trip_id: str,
                         "timestamp": datetime.utcnow().isoformat()
                     })
 
+            # If the user explicitly asked to start planning, attempt to generate trip options now.
+            if analysis.get("start_planning"):
+                await check_availability_consensus(trip_id, db, force_generate=True)
+
         except Exception as e:
             print(f"Error processing message with AI agent: {e}")
             # Continue without AI processing if there's an error
@@ -736,7 +740,7 @@ async def check_voting_consensus(trip_id: str, db: Session):
             await generate_detailed_trip_plan(trip_id, winning_option, db, manager)
 
 
-async def check_availability_consensus(trip_id: str, db: Session):
+async def check_availability_consensus(trip_id: str, db: Session, force_generate: bool = False):
     """Check if availability consensus has been reached and generate trip options if so."""
     # Get all participants and availability
     participants = db.query(TripParticipant).filter(
@@ -751,10 +755,6 @@ async def check_availability_consensus(trip_id: str, db: Session):
     participants_with_availability = set(avail.user_id
                                          for avail in availability)
 
-    # Only consider participants who have submitted availability data
-    # This prevents users who haven't marked any dates from blocking consensus
-    if len(participants_with_availability) < 2:
-        return
 
     # Group availability by date
     availability_by_date = {}
@@ -778,7 +778,7 @@ async def check_availability_consensus(trip_id: str, db: Session):
             consensus_dates.append(date_str)
 
     # Check if we have enough consensus dates (3 or more)
-    if len(consensus_dates) >= 3:
+    if len(consensus_dates) >= 3 or force_generate:
         await generate_trip_options_internal(trip_id, consensus_dates, db,
                                              manager)
 
