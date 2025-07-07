@@ -1,7 +1,7 @@
 import { useParams } from "wouter";
 import { useTripState } from "@/hooks/useTripState";
 import { useIsMobile } from "@/hooks/use-mobile";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import {
   Plane,
   Users,
@@ -29,6 +29,7 @@ export default function ChatPage() {
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [showPreferencesDialog, setShowPreferencesDialog] = useState(false);
   const { toast } = useToast();
+  const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const {
     tripContext,
@@ -41,6 +42,13 @@ export default function ChatPage() {
     missingPreferences,
     isConnected,
   } = useTripState(tripId, userId);
+
+  // Auto-scroll to bottom when new messages arrive
+  useEffect(() => {
+    if (messagesEndRef.current) {
+      messagesEndRef.current.scrollIntoView({ behavior: "smooth" });
+    }
+  }, [tripContext.messages]);
 
   const getStateDisplay = (state: string) => {
     switch (state) {
@@ -203,20 +211,23 @@ export default function ChatPage() {
         {/* Messages */}
         <div className="flex-1 overflow-y-auto p-4 space-y-4">
           {tripContext.participants.length > 0 ? (
-            tripContext.messages.map((message) => (
-              <ChatMessage
-                key={message.id}
-                message={message}
-                participants={tripContext.participants}
-                options={tripContext.options}
-                votes={tripContext.votes}
-                availability={tripContext.availability}
-                onVote={vote}
-                onSetAvailability={setAvailability}
-                onSetBatchAvailability={setBatchAvailability}
-                userId={userId}
-              />
-            ))
+            <>
+              {tripContext.messages.map((message) => (
+                <ChatMessage
+                  key={message.id}
+                  message={message}
+                  participants={tripContext.participants}
+                  options={tripContext.options}
+                  votes={tripContext.votes}
+                  availability={tripContext.availability}
+                  onVote={vote}
+                  onSetAvailability={setAvailability}
+                  onSetBatchAvailability={setBatchAvailability}
+                  userId={userId}
+                />
+              ))}
+              <div ref={messagesEndRef} />
+            </>
           ) : (
             <div className="text-center text-gray-500">
               Loading participants...
