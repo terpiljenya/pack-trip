@@ -367,8 +367,10 @@ export function useTripState(tripId: string, userId: number) {
     const newMessages = wsMessages.slice(lastProcessedIndex.current + 1);
     
     newMessages.forEach((message: WebSocketMessage) => {
+      console.log('DEBUG: Processing WebSocket message:', message.type, message);
       switch (message.type) {
         case "new_message":
+          console.log('DEBUG: Invalidating message queries due to new_message WebSocket event');
           queryClient.invalidateQueries({
             queryKey: [`/api/trips/${tripId}/messages`],
           });

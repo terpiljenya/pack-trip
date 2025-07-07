@@ -63,12 +63,18 @@ class ConnectionManager:
                                 message: dict,
                                 exclude: WebSocket = None):
         if trip_id in self.active_connections:
+            connection_count = len(self.active_connections[trip_id])
+            print(f"DEBUG: Broadcasting to {connection_count} connections for trip {trip_id}: {message.get('type', 'unknown')}")
+            
             for connection in self.active_connections[trip_id]:
                 if connection != exclude:
                     try:
                         await connection.send_json(message)
-                    except:
+                    except Exception as e:
+                        print(f"DEBUG: Failed to send message to connection: {e}")
                         pass
+        else:
+            print(f"DEBUG: No active connections for trip {trip_id}")
 
 
 manager = ConnectionManager()
@@ -88,6 +94,7 @@ async def websocket_endpoint(websocket: WebSocket):
             if data["type"] == "join_trip":
                 trip_id = data["tripId"]
                 user_id = data["userId"]
+                print(f"DEBUG: User {user_id} joining trip {trip_id} via WebSocket")
                 await manager.connect(websocket, trip_id)
 
                 # Update participant online status
@@ -263,7 +270,22 @@ async def join_trip(trip_id: str, token: str, user_info: dict, db: Session = Dep
     
     db.commit()
     
-    # Broadcast user joined
+    # Broadcast new join message
+    db.refresh(join_message)
+    await manager.broadcast_to_trip(trip_id, {
+        "type": "new_message",
+        "message": {
+            "id": join_message.id,
+            "trip_id": join_message.trip_id,
+            "user_id": join_message.user_id,
+            "type": join_message.type,
+            "content": join_message.content,
+            "timestamp": join_message.timestamp.isoformat()
+        },
+        "timestamp": datetime.utcnow().isoformat()
+    })
+    
+    # Also broadcast user joined event
     await manager.broadcast_to_trip(trip_id, {
         "type": "user_joined",
         "user_id": user_id,
@@ -332,11 +354,19 @@ async def create_message(trip_id: str,
     db.commit()
     db.refresh(db_message)
 
-    # Broadcast new message
+    # Broadcast new message  
     await manager.broadcast_to_trip(
         trip_id, {
             "type": "new_message",
-            "message": schemas.Message.from_orm(db_message).dict(),
+            "message": {
+                "id": db_message.id,
+                "trip_id": db_message.trip_id,
+                "user_id": db_message.user_id,
+                "type": db_message.type,
+                "content": db_message.content,
+                "timestamp": db_message.timestamp.isoformat(),
+                "metadata": db_message.meta_data
+            },
             "timestamp": datetime.utcnow().isoformat()
         })
 
@@ -391,7 +421,14 @@ async def create_vote(trip_id: str,
             trip_id, {
                 "type": "vote_update",
                 "action": "added",
-                "vote": schemas.Vote.from_orm(db_vote).dict(),
+                "vote": {
+                    "id": db_vote.id,
+                    "trip_id": db_vote.trip_id,
+                    "user_id": db_vote.user_id,
+                    "option_id": db_vote.option_id,
+                    "emoji": db_vote.emoji,
+                    "timestamp": db_vote.timestamp.isoformat()
+                },
                 "timestamp": datetime.utcnow().isoformat()
             })
 
@@ -1074,8 +1111,17 @@ async def set_preferences(
     db.commit()
 
     # Broadcast new message
+    db.refresh(system_message)
     await manager.broadcast_to_trip(trip_id, {
         "type": "new_message",
+        "message": {
+            "id": system_message.id,
+            "trip_id": system_message.trip_id,
+            "user_id": system_message.user_id,
+            "type": system_message.type,
+            "content": system_message.content,
+            "timestamp": system_message.timestamp.isoformat()
+        },
         "timestamp": datetime.utcnow().isoformat()
     })
 
