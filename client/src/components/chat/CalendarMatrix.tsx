@@ -258,7 +258,7 @@ export default function CalendarMatrix({
                       allAvailable && "bg-green-500 text-white font-semibold",
                       !allAvailable && availableUsers.length > 0 && "bg-amber-100 dark:bg-amber-900/20",
                       isPendingSelected && "ring-2 ring-primary ring-offset-1",
-                      hasPendingChange && "ring-2 ring-orange-300 ring-offset-1 bg-orange-50",
+                      hasPendingChange && "ring-2 ring-orange-300 ring-offset-1 bg-orange-50 text-black",
                       (isSubmitting || isLoading) && "opacity-50 cursor-not-allowed"
                     )}
                   >

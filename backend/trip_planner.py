@@ -67,6 +67,40 @@ async def generate_trip_options_internal(trip_id: str, consensus_dates: list, db
         if existing_message:
             return
 
+        # Add pending status message
+        pending_message = Message(
+            trip_id=trip_id,
+            user_id=None,
+            type="agent",
+            content="🔍 Looking for the best trip options based on your preferences... This may take a moment!",
+            meta_data={"type": "status_pending", "status": "generating_options"}
+        )
+        db.add(pending_message)
+        db.commit()
+        db.refresh(pending_message)
+
+        # Broadcast pending status
+        await manager.broadcast_to_trip(
+            trip_id, {
+                "type": "new_message", 
+                "message": {
+                    "id": pending_message.id,
+                    "trip_id": pending_message.trip_id,
+                    "user_id": pending_message.user_id,
+                    "type": pending_message.type,
+                    "content": pending_message.content,
+                    "timestamp": pending_message.timestamp.isoformat(),
+                    "metadata": pending_message.meta_data
+                },
+                "timestamp": datetime.utcnow().isoformat()
+            }
+        )
+        
+        # Store pending message ID for later deletion
+        pending_message_id = pending_message.id
+
+        print(f"DEBUG: Starting AI generation for trip {trip_id}")
+
         # Get user preferences for context including raw preferences
         preferences = db.query(UserPreferences).filter(
             UserPreferences.trip_id == trip_id).all()
@@ -228,6 +262,19 @@ Each option should explain HOW it addresses the group's specific conflicts and e
 
         # Refresh the message to get the ID
         db.refresh(db_message)
+
+        # Delete the pending message now that we have the real result
+        db.query(Message).filter(Message.id == pending_message_id).delete()
+        db.commit()
+
+        # Broadcast pending message deletion
+        await manager.broadcast_to_trip(
+            trip_id, {
+                "type": "message_deleted",
+                "message_id": pending_message_id,
+                "timestamp": datetime.utcnow().isoformat()
+            }
+        )
 
         # Broadcast the new message
         message_dict = {

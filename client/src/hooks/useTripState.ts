@@ -370,14 +370,29 @@ export function useTripState(tripId: string, userId: number) {
       console.log('DEBUG: Processing WebSocket message:', message.type, message);
       switch (message.type) {
         case "new_message":
-          console.log('DEBUG: Invalidating message queries due to new_message WebSocket event');
-          queryClient.invalidateQueries({
-            queryKey: [`/api/trips/${tripId}/messages`],
-          });
-          // Also invalidate trip data to update state
-          queryClient.invalidateQueries({
-            queryKey: [`/api/trips/${tripId}`],
-          });
+          console.log('DEBUG: Processing new_message WebSocket event:', message.message);
+          
+          // Check if this is a pending status message
+          const isPendingMessage = message.message?.metadata?.type === "status_pending";
+          
+          if (isPendingMessage) {
+            // Handle pending messages directly in cache without API refetch
+            console.log('DEBUG: Adding pending message directly to cache');
+            queryClient.setQueryData([`/api/trips/${tripId}/messages`], (oldData: any) => {
+              if (!oldData) return [message.message];
+              return [...oldData, message.message];
+            });
+          } else {
+            // For regular messages, invalidate to refetch from API
+            console.log('DEBUG: Invalidating message queries due to regular new_message WebSocket event');
+            queryClient.invalidateQueries({
+              queryKey: [`/api/trips/${tripId}/messages`],
+            });
+            // Also invalidate trip data to update state
+            queryClient.invalidateQueries({
+              queryKey: [`/api/trips/${tripId}`],
+            });
+          }
           break;
         case "vote_update":
           queryClient.invalidateQueries({
@@ -408,7 +423,13 @@ export function useTripState(tripId: string, userId: number) {
             queryKey: [`/api/trips/${tripId}/participants`],
           });
           break;
- 
+        case "message_deleted":
+          // Handle message deletion by updating cache directly
+          queryClient.setQueryData([`/api/trips/${tripId}/messages`], (oldData: any) => {
+            if (!oldData) return oldData;
+            return oldData.filter((msg: any) => msg.id !== message.message_id);
+          });
+          break;
         case "options_generated":
           queryClient.invalidateQueries({
             queryKey: [`/api/trips/${tripId}/options`],

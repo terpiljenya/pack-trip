@@ -797,6 +797,41 @@ async def generate_detailed_trip_plan(trip_id: str, winning_option: dict,
     """Generate detailed trip plan using OpenAI for the winning option."""
     try:
         print(f"DEBUG: Generating detailed trip plan for trip {trip_id}")
+        
+        # Add pending status message
+        pending_message = Message(
+            trip_id=trip_id,
+            user_id=None,
+            type="agent",
+            content="✨ Creating your detailed trip plan with specific venues and activities... This may take a moment!",
+            meta_data={"type": "status_pending", "status": "generating_detailed_plan"}
+        )
+        db.add(pending_message)
+        db.commit()
+        db.refresh(pending_message)
+
+        # Broadcast pending status
+        await manager.broadcast_to_trip(
+            trip_id, {
+                "type": "new_message",
+                "message": {
+                    "id": pending_message.id,
+                    "trip_id": pending_message.trip_id,
+                    "user_id": pending_message.user_id,
+                    "type": pending_message.type,
+                    "content": pending_message.content,
+                    "timestamp": pending_message.timestamp.isoformat(),
+                    "metadata": pending_message.meta_data
+                },
+                "timestamp": datetime.utcnow().isoformat()
+            }
+        )
+        
+        # Store pending message ID for later deletion
+        pending_message_id = pending_message.id
+        
+        print(f"DEBUG: Starting detailed plan generation for trip {trip_id}")
+        
         # Get trip details
         trip = db.query(Trip).filter(Trip.trip_id == trip_id).first()
         if not trip:
@@ -1046,6 +1081,19 @@ async def generate_detailed_trip_plan(trip_id: str, winning_option: dict,
         }
 
         print(f"DEBUG: Broadcasting detailed plan message: {message_dict}")
+
+        # Delete the pending message now that we have the real result
+        db.query(Message).filter(Message.id == pending_message_id).delete()
+        db.commit()
+
+        # Broadcast pending message deletion
+        await manager.broadcast_to_trip(
+            trip_id, {
+                "type": "message_deleted",
+                "message_id": pending_message_id,
+                "timestamp": datetime.utcnow().isoformat()
+            }
+        )
 
         # Broadcast the new plan
         await manager.broadcast_to_trip(
@@ -1304,10 +1352,11 @@ async def reset_carol(request: dict, db: Session = Depends(get_db)):
     trip_id = request.get("tripId")
     user_id = request.get("userId")
 
-    # Only allow resetting Carol (user_id = 3)
-    if user_id != 3:
-        raise HTTPException(status_code=403,
-                            detail="Can only reset Carol's data")
+
+    # Delete ALL participants for this trip
+    db.query(TripParticipant).filter(
+        TripParticipant.trip_id == trip_id).delete()
+
 
     # Delete ALL preferences for this trip
     db.query(UserPreferences).filter(
@@ -1340,6 +1389,21 @@ async def reset_carol(request: dict, db: Session = Depends(get_db)):
     # db.query(TripOption).filter(TripOption.trip_id == trip_id).delete()
 
     db.commit()
+
+    # Add participants - Alice and Bob have submitted preferences, Carol hasn't
+    participants = [
+        TripParticipant(trip_id=trip_id,
+                        user_id=1,
+                        role="organizer",
+                        has_submitted_preferences=True),
+        TripParticipant(trip_id=trip_id,
+                        user_id=2,
+                        role="traveler",
+                        has_submitted_preferences=True),
+    ]
+
+    for participant in participants:
+        db.add(participant)
 
     # Recreate initial messages
     initial_messages = [
@@ -1493,6 +1557,24 @@ async def reset_carol(request: dict, db: Session = Depends(get_db)):
                                          datetime(2025, 10, 16)
                                      ])
         db.add(bob_avail)
+
+    # Clear existing votes
+    db.query(Vote).filter(Vote.trip_id == trip_id).delete()
+
+    # Add votes for Alice and Bob on the first option ("cultural")
+    alice_vote = Vote(
+        trip_id=trip_id,
+        user_id=1,  # Alice
+        option_id="option_1",
+        emoji="👍")
+    db.add(alice_vote)
+
+    bob_vote = Vote(
+        trip_id=trip_id,
+        user_id=2,  # Bob
+        option_id="option_1",
+        emoji="👍")
+    db.add(bob_vote)
 
     db.commit()
 

@@ -1,4 +1,4 @@
-import { Bot, User, MapPinPlus } from "lucide-react";
+import { Bot, User, MapPinPlus, Loader2 } from "lucide-react";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import ReactMarkdown from "react-markdown";
@@ -120,6 +120,7 @@ export default function ChatMessage({
     const showOptions =
       message.metadata && message.metadata.type === "trip_options";
     const showConflict = message.content.includes("conflict");
+    const isPending = message.metadata && message.metadata.type === "status_pending";
 
     // Get options from message metadata if available
     const messageOptions = message.metadata?.options || [];
@@ -138,9 +139,16 @@ export default function ChatMessage({
               {message.timestamp.toLocaleTimeString()}
             </span>
           </div>
-          <div className="bg-slate-100 rounded-2xl p-4 shadow-sm">
+          <div className={`${isPending ? 'bg-blue-50 border-l-4 border-l-blue-400' : 'bg-slate-100'} rounded-2xl p-4 shadow-sm`}>
             <div className="prose prose-sm max-w-none prose-slate text-slate-800 mb-3">
-              <ReactMarkdown>{message.content}</ReactMarkdown>
+              <div className="flex items-center gap-2">
+                {isPending && (
+                  <Loader2 className="w-4 h-4 text-blue-600 animate-spin flex-shrink-0" />
+                )}
+                <div className="flex-1">
+                  <ReactMarkdown>{message.content}</ReactMarkdown>
+                </div>
+              </div>
             </div>
 
             {showCalendar && (
