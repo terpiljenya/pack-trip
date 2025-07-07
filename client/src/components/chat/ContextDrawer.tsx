@@ -11,6 +11,7 @@ interface ContextDrawerProps {
   tripContext: TripContext;
   onVote: (data: { optionId: string; emoji: string }) => void;
   onSetAvailability: (data: { date: Date; available: boolean }) => void;
+  onSetBatchAvailability: (dates: Array<{ date: Date; available: boolean }>) => void;
   userId: number;
 }
 
@@ -46,16 +47,10 @@ function getRoadmapSteps(tripContext: TripContext): RoadmapStep[] {
       current: state === 'COLLECTING_DATES' && hasPreferences && !hasAvailability
     },
     {
-      title: "Review Trip Options",
-      description: "AI generates personalized trip options based on preferences",
-      completed: hasOptions,
-      current: state === 'VOTING_HIGH_LEVEL' && !hasOptions
-    },
-    {
       title: "Vote on Favorite Option",
       description: "Team votes on their preferred trip option",
       completed: hasVotes && hasDetailedPlan,
-      current: state === 'VOTING_HIGH_LEVEL' && hasVotes && !hasDetailedPlan
+      current: state === 'VOTING_HIGH_LEVEL'
     },
     {
       title: "Get Detailed Itinerary",
@@ -76,6 +71,7 @@ export default function ContextDrawer({
   tripContext, 
   onVote, 
   onSetAvailability, 
+  onSetBatchAvailability, 
   userId 
 }: ContextDrawerProps) {
   const [activeTab, setActiveTab] = useState('roadmap');

@@ -34,7 +34,12 @@ export function useWebSocket(tripId: string, userId: number) {
       ws.onmessage = (event) => {
         try {
           const message = JSON.parse(event.data);
-          setMessages(prev => [...prev, message]);
+          console.log('DEBUG: Received WebSocket message:', message);
+          setMessages(prev => {
+            const newMessages = [...prev, message];
+            console.log(`DEBUG: Total WebSocket messages: ${newMessages.length}`);
+            return newMessages;
+          });
         } catch (error) {
           console.error('Failed to parse WebSocket message:', error);
         }

@@ -29,6 +29,19 @@ export default defineConfig({
     emptyOutDir: true,
   },
   server: {
+    proxy: {
+      // Proxy API calls to FastAPI backend
+      "/api": {
+        target: "http://localhost:5001",
+        changeOrigin: true,
+      },
+      // Proxy WebSocket connections to FastAPI backend
+      "/ws": {
+        target: "ws://localhost:5001",
+        ws: true,
+        changeOrigin: true,
+      },
+    },
     fs: {
       strict: true,
       deny: ["**/.*"],

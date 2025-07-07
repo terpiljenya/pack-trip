@@ -48,6 +48,7 @@ interface ChatMessageProps {
   }>;
   onVote: (data: { optionId: string; emoji: string }) => void;
   onSetAvailability: (data: { date: Date; available: boolean }) => void;
+  onSetBatchAvailability: (dates: Array<{ date: Date; available: boolean }>) => void;
   userId: number;
 }
 
@@ -59,6 +60,7 @@ export default function ChatMessage({
   availability,
   onVote,
   onSetAvailability,
+  onSetBatchAvailability,
   userId,
 }: ChatMessageProps) {
   // Convert both to numbers to ensure proper comparison
@@ -120,10 +122,11 @@ export default function ChatMessage({
         "mark their availability on the calendar below",
       ) ||
       message.content.includes("mark your availability on the calendar below");
-    const showOptions =
-      message.content.includes("itinerary options") ||
-      message.content.includes("3 fantastic itinerary options");
+    const showOptions = message.metadata && message.metadata.type === "trip_options";
     const showConflict = message.content.includes("conflict");
+
+    // Get options from message metadata if available
+    const messageOptions = message.metadata?.options || [];
 
     return (
       <div className="flex items-start space-x-3">
@@ -147,13 +150,36 @@ export default function ChatMessage({
                 availability={availability}
                 participants={participants}
                 onSetAvailability={onSetAvailability}
+                onSetBatchAvailability={onSetBatchAvailability}
                 userId={userId}
               />
             )}
 
             {showOptions && (
               <div className="space-y-4">
-                {options.filter((opt) => opt.type === "itinerary").length >
+                {messageOptions.length > 0 ? (
+                  messageOptions.map((option: any, index: number) => (
+                    <ItineraryCard
+                      key={option.option_id || index}
+                      option={{
+                        id: index,
+                        optionId: option.option_id,
+                        type: option.type,
+                        title: option.title,
+                        description: option.description,
+                        price: option.price,
+                        image: option.image,
+                        metadata: option.meta_data,
+                      }}
+                      votes={votes.filter(
+                        (v) => v.optionId === option.option_id,
+                      )}
+                      participants={participants}
+                      onVote={onVote}
+                      userId={userId}
+                    />
+                  ))
+                ) : options.filter((opt) => opt.type === "itinerary").length >
                 0 ? (
                   options
                     .filter((opt) => opt.type === "itinerary")

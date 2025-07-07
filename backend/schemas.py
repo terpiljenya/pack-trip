@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from datetime import datetime
 from typing import Optional, List, Any
 
@@ -79,7 +79,7 @@ class TripParticipant(BaseModel):
 class MessageBase(BaseModel):
     content: str
     type: Optional[str] = "user"
-    meta_data: Optional[Any] = None
+    metadata: Optional[Any] = Field(None, alias="meta_data")
 
 class MessageCreate(MessageBase):
     user_id: Optional[int] = None
@@ -92,6 +92,7 @@ class Message(MessageBase):
     
     class Config:
         from_attributes = True
+        populate_by_name = True
 
 # Vote schemas
 class VoteBase(BaseModel):
@@ -138,6 +139,10 @@ class DateAvailabilityBase(BaseModel):
 
 class DateAvailabilityCreate(DateAvailabilityBase):
     user_id: int
+
+class DateAvailabilityBatchCreate(BaseModel):
+    user_id: int
+    dates: List[DateAvailabilityBase]
 
 class DateAvailability(DateAvailabilityBase):
     id: int

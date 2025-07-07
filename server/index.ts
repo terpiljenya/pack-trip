@@ -10,6 +10,8 @@ sys.path.insert(0, '.')
 import os
 os.environ["PYTHONPATH"] = "."
 os.environ["NODE_ENV"] = "development"
+from dotenv import load_dotenv
+load_dotenv()
 
 # Start Vite
 import subprocess
@@ -17,9 +19,9 @@ print("Starting Vite frontend on port 5173...")
 vite = subprocess.Popen(["npx", "vite", "--host", "0.0.0.0", "--port", "5173"])
 
 # Start FastAPI without reload
-print("Starting FastAPI backend on port 5000...")
+print("Starting FastAPI backend on port 5001...")
 import uvicorn
-uvicorn.run("backend.main:app", host="0.0.0.0", port=5000, log_level="info")
+uvicorn.run("backend.main:app", host="0.0.0.0", port=5001, log_level="info")
 `], {
   stdio: 'inherit',
   cwd: process.cwd()

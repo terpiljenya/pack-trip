@@ -5,6 +5,10 @@ import os
 import signal
 import time
 
+from dotenv import load_dotenv
+
+load_dotenv()
+
 # Handle Ctrl+C gracefully
 def signal_handler(sig, frame):
     print('\nShutting down servers...')
@@ -13,7 +17,7 @@ def signal_handler(sig, frame):
 signal.signal(signal.SIGINT, signal_handler)
 
 # Start the FastAPI backend
-print("Starting FastAPI backend on port 5000...")
+print("Starting FastAPI backend on port 5001...")
 backend_process = subprocess.Popen(
     [sys.executable, "run_backend.py"],
     env={**os.environ}

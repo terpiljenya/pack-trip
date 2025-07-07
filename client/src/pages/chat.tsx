@@ -35,6 +35,7 @@ export default function ChatPage() {
     sendMessage,
     vote,
     setAvailability,
+    setBatchAvailability,
     setPreferences,
     preferences,
     missingPreferences,
@@ -126,6 +127,7 @@ export default function ChatPage() {
                 tripContext={tripContext}
                 onVote={vote}
                 onSetAvailability={setAvailability}
+                onSetBatchAvailability={setBatchAvailability}
                 userId={userId}
               />
             </SheetContent>
@@ -211,6 +213,7 @@ export default function ChatPage() {
                 availability={tripContext.availability}
                 onVote={vote}
                 onSetAvailability={setAvailability}
+                onSetBatchAvailability={setBatchAvailability}
                 userId={userId}
               />
             ))
@@ -241,6 +244,7 @@ export default function ChatPage() {
             tripContext={tripContext}
             onVote={vote}
             onSetAvailability={setAvailability}
+            onSetBatchAvailability={setBatchAvailability}
             userId={userId}
           />
         </div>

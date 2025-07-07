@@ -1,7 +1,8 @@
-import { useState } from 'react';
-import { Calendar, Check, Users } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Calendar, Check, Users, Save, RotateCcw } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
+import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 interface CalendarMatrixProps {
@@ -20,19 +21,43 @@ interface CalendarMatrixProps {
     role: string;
   }>;
   onSetAvailability: (data: { date: Date; available: boolean }) => void;
+  onSetBatchAvailability: (dates: Array<{ date: Date; available: boolean }>) => void;
   userId: number;
   isLoading?: boolean;
 }
+
+type DateSelection = {
+  [dateKey: string]: boolean; // dateKey format: "YYYY-MM-DD"
+};
 
 export default function CalendarMatrix({
   availability,
   participants,
   onSetAvailability,
+  onSetBatchAvailability,
   userId,
   isLoading = false
 }: CalendarMatrixProps) {
   const [selectedMonth] = useState(new Date(2024, 9, 1)); // October 2024
-  const [clickedDate, setClickedDate] = useState<Date | null>(null);
+  const [pendingSelections, setPendingSelections] = useState<DateSelection>({});
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [hasChanges, setHasChanges] = useState(false);
+
+  // Initialize pending selections from current availability
+  useEffect(() => {
+    const initialSelections: DateSelection = {};
+    
+    availability
+      .filter(a => a.userId === userId)
+      .forEach(a => {
+        const date = new Date(a.date);
+        const dateKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+        initialSelections[dateKey] = a.available;
+      });
+    
+    setPendingSelections(initialSelections);
+    setHasChanges(false);
+  }, [availability, userId]);
 
   const getDaysInMonth = (date: Date) => {
     const year = date.getFullYear();
@@ -57,6 +82,10 @@ export default function CalendarMatrix({
     return days;
   };
 
+  const getDateKey = (date: Date) => {
+    return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+  };
+
   const getAvailableUsers = (date: Date | null) => {
     if (!date) return [];
     
@@ -73,39 +102,91 @@ export default function CalendarMatrix({
       .filter(Boolean);
   };
 
-  const isUserAvailable = (date: Date | null) => {
+  const isUserAvailableInPending = (date: Date | null) => {
     if (!date) return false;
-    const userAvailability = availability.find(a => {
-      const aDate = new Date(a.date);
-      return a.userId === userId &&
-             aDate.getFullYear() === date.getFullYear() &&
-             aDate.getMonth() === date.getMonth() &&
-             aDate.getDate() === date.getDate();
-    });
-    return userAvailability?.available || false;
+    const dateKey = getDateKey(date);
+    return pendingSelections[dateKey] || false;
   };
 
   const isEveryoneAvailable = (date: Date | null) => {
     if (!date) return false;
     const availableUsers = getAvailableUsers(date);
-    return availableUsers.length === participants.length;
+    const dateKey = getDateKey(date);
+    
+    // Include current user's pending selection in the count
+    const currentUserPending = pendingSelections[dateKey];
+    const currentUserInSaved = availableUsers.some(u => u && u.userId === userId);
+    
+    let totalAvailable = availableUsers.filter(u => u && u.userId !== userId).length;
+    if (currentUserPending) {
+      totalAvailable += 1;
+    } else if (!currentUserPending && currentUserInSaved) {
+      // User was available but now unselected in pending
+      return false;
+    }
+    
+    return totalAvailable === participants.length;
   };
 
   const handleDateClick = (date: Date | null) => {
-    if (!date || isLoading) return;
-    // Create a date at noon UTC to avoid timezone issues
-    const utcDate = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate(), 12, 0, 0));
-    const currentlyAvailable = isUserAvailable(date);
-    setClickedDate(date);
-    onSetAvailability({ date: utcDate, available: !currentlyAvailable });
+    if (!date || isSubmitting || isLoading) return;
     
-    // Clear clicked date after a short delay
-    setTimeout(() => setClickedDate(null), 500);
+    const dateKey = getDateKey(date);
+    const currentSelection = pendingSelections[dateKey] || false;
+    
+    setPendingSelections(prev => ({
+      ...prev,
+      [dateKey]: !currentSelection
+    }));
+    
+    setHasChanges(true);
+  };
+
+  const handleSubmit = async () => {
+    if (!hasChanges || isSubmitting) return;
+    
+    setIsSubmitting(true);
+    
+    try {
+      // Prepare all dates for batch submission
+      const batchDates = Object.entries(pendingSelections).map(([dateKey, available]) => {
+        const [year, month, day] = dateKey.split('-').map(Number);
+        const date = new Date(Date.UTC(year, month - 1, day, 12, 0, 0));
+        return { date, available };
+      });
+      
+      // Submit all dates at once
+      onSetBatchAvailability(batchDates);
+      setHasChanges(false);
+    } catch (error) {
+      console.error('Error submitting availability:', error);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleReset = () => {
+    // Reset to current saved state
+    const initialSelections: DateSelection = {};
+    
+    availability
+      .filter(a => a.userId === userId)
+      .forEach(a => {
+        const date = new Date(a.date);
+        const dateKey = getDateKey(date);
+        initialSelections[dateKey] = a.available;
+      });
+    
+    setPendingSelections(initialSelections);
+    setHasChanges(false);
   };
 
   const days = getDaysInMonth(selectedMonth);
   const weekDays = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+  
+  // Count consensus days using pending selections
   const allAvailableDays = days.filter(date => date && isEveryoneAvailable(date)).length;
+  const pendingSelectedCount = Object.values(pendingSelections).filter(Boolean).length;
 
   return (
     <div className="space-y-4">
@@ -114,7 +195,7 @@ export default function CalendarMatrix({
           <Calendar className="h-4 w-4" />
           <h3 className="font-medium">October 2024</h3>
         </div>
-        <p className="text-xs text-muted-foreground">Click dates to mark availability</p>
+        <p className="text-xs text-muted-foreground">Select your available dates</p>
       </div>
       
       <TooltipProvider>
@@ -130,34 +211,50 @@ export default function CalendarMatrix({
               return <div key={`empty-${index}`} className="p-2" />;
             }
             
-            const isUserAvail = isUserAvailable(date);
+            const isPendingSelected = isUserAvailableInPending(date);
             const availableUsers = getAvailableUsers(date);
             const allAvailable = isEveryoneAvailable(date);
+            
+            // Check if this date has pending changes
+            const dateKey = getDateKey(date);
+            const savedSelection = availability.find(a => {
+              const aDate = new Date(a.date);
+              return a.userId === userId &&
+                     aDate.getFullYear() === date.getFullYear() &&
+                     aDate.getMonth() === date.getMonth() &&
+                     aDate.getDate() === date.getDate();
+            })?.available || false;
+            
+            const hasPendingChange = pendingSelections[dateKey] !== undefined && 
+                                   pendingSelections[dateKey] !== savedSelection;
             
             return (
               <Tooltip key={date.toISOString()}>
                 <TooltipTrigger asChild>
                   <button
                     onClick={() => handleDateClick(date)}
-                    disabled={isLoading}
+                    disabled={isSubmitting || isLoading}
                     className={cn(
                       "relative p-2 rounded-md text-sm transition-all",
                       "hover:scale-105 hover:shadow-md",
                       allAvailable && "bg-green-500 text-white font-semibold",
                       !allAvailable && availableUsers.length > 0 && "bg-amber-100 dark:bg-amber-900/20",
-                      clickedDate?.toDateString() === date.toDateString() && "animate-pulse",
-                      isLoading && "opacity-50 cursor-not-allowed",
-                      isUserAvail && "ring-2 ring-primary ring-offset-1"
+                      isPendingSelected && "ring-2 ring-primary ring-offset-1",
+                      hasPendingChange && "ring-2 ring-orange-400 ring-offset-1 bg-orange-50",
+                      (isSubmitting || isLoading) && "opacity-50 cursor-not-allowed"
                     )}
                   >
                     <div className="font-medium">{format(date, 'd')}</div>
-                    {isUserAvail && (
+                    {isPendingSelected && (
                       <Check className="h-3 w-3 absolute top-0.5 right-0.5 text-primary" />
+                    )}
+                    {hasPendingChange && (
+                      <div className="w-2 h-2 bg-orange-400 rounded-full absolute top-0.5 left-0.5" />
                     )}
                     {availableUsers.length > 0 && (
                       <div className="flex justify-center mt-0.5">
                         <div className="flex -space-x-1">
-                          {availableUsers.slice(0, 3).map((user) => (
+                          {availableUsers.slice(0, 3).map((user) => user && (
                             <div
                               key={user.userId}
                               className="w-2 h-2 rounded-full border border-background"
@@ -174,10 +271,16 @@ export default function CalendarMatrix({
                     <p className="font-medium">
                       {format(date, 'EEEE, MMMM d')}
                     </p>
+                    {isPendingSelected && (
+                      <p className="text-primary font-medium">
+                        ✓ You selected this date
+                        {hasPendingChange && " (pending)"}
+                      </p>
+                    )}
                     {availableUsers.length > 0 ? (
                       <>
-                        <p className="text-muted-foreground">Available:</p>
-                        {availableUsers.map(user => (
+                        <p className="text-muted-foreground">Also available:</p>
+                        {availableUsers.filter(u => u && u.userId !== userId).map(user => user && (
                           <p key={user.userId} className="flex items-center gap-1">
                             <span 
                               className="w-2 h-2 rounded-full"
@@ -187,9 +290,9 @@ export default function CalendarMatrix({
                           </p>
                         ))}
                       </>
-                    ) : (
+                    ) : availableUsers.length === 0 && !isPendingSelected ? (
                       <p className="text-muted-foreground">No one available yet</p>
-                    )}
+                    ) : null}
                   </div>
                 </TooltipContent>
               </Tooltip>
@@ -197,6 +300,50 @@ export default function CalendarMatrix({
           })}
         </div>
       </TooltipProvider>
+      
+      {/* Action Buttons */}
+      {hasChanges && (
+        <div className="flex gap-2 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
+          <div className="flex-1">
+            <p className="text-sm font-medium text-blue-900 dark:text-blue-100">
+              You have {pendingSelectedCount} dates selected
+            </p>
+            <p className="text-xs text-blue-700 dark:text-blue-300">
+              Click "Save Availability" to confirm your dates
+            </p>
+          </div>
+          <div className="flex gap-2">
+            <Button
+              onClick={handleReset}
+              variant="outline"
+              size="sm"
+              disabled={isSubmitting}
+              className="text-xs"
+            >
+              <RotateCcw className="h-3 w-3 mr-1" />
+              Reset
+            </Button>
+            <Button
+              onClick={handleSubmit}
+              size="sm"
+              disabled={isSubmitting}
+              className="text-xs"
+            >
+              {isSubmitting ? (
+                <>
+                  <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin mr-1" />
+                  Saving...
+                </>
+              ) : (
+                <>
+                  <Save className="h-3 w-3 mr-1" />
+                  Save Availability
+                </>
+              )}
+            </Button>
+          </div>
+        </div>
+      )}
       
       <div className="space-y-2 text-sm">
         <div className="flex items-center gap-2 p-2 bg-green-50 dark:bg-green-900/20 rounded-md">
@@ -207,9 +354,10 @@ export default function CalendarMatrix({
         </div>
         
         <div className="text-xs text-muted-foreground space-y-1">
-          <p>• Click any date to toggle your availability</p>
+          <p>• Click dates to select your availability</p>
           <p>• Green dates = everyone is available</p>
-          <p>• Your selected dates have a blue ring</p>
+          <p>• Orange dot = unsaved changes</p>
+          <p>• Click "Save Availability" to confirm your selection</p>
         </div>
       </div>
     </div>

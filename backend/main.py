@@ -178,6 +178,7 @@ async def create_trip(trip: schemas.TripCreate, db: Session = Depends(get_db)):
 
 @app.get("/api/trips/{trip_id}/messages", response_model=list[schemas.Message])
 async def get_messages(trip_id: str, db: Session = Depends(get_db)):
+    print(f"DEBUG: Getting messages for trip {trip_id}")
     messages = db.query(Message).filter(Message.trip_id == trip_id).order_by(
         Message.timestamp).all()
     return messages
@@ -263,11 +264,16 @@ async def create_vote(trip_id: str,
 async def check_voting_consensus(trip_id: str, db: Session):
     """Check if voting consensus has been reached and generate detailed plan if so."""
     # Get all participants and votes
+    print(f"DEBUG: Checking voting consensus for trip {trip_id}")
     participants = db.query(TripParticipant).filter(
         TripParticipant.trip_id == trip_id).all()
     votes = db.query(Vote).filter(Vote.trip_id == trip_id,
                                   Vote.emoji == "👍").all()
     options = db.query(TripOption).filter(TripOption.trip_id == trip_id).all()
+
+    print(f"DEBUG: Participants: {participants}")
+    print(f"DEBUG: Votes: {votes}")
+    print(f"DEBUG: Options: {options}")
 
     if not participants or not votes or not options:
         return
@@ -278,6 +284,8 @@ async def check_voting_consensus(trip_id: str, db: Session):
         if vote.option_id not in votes_by_option:
             votes_by_option[vote.option_id] = []
         votes_by_option[vote.option_id].append(vote)
+
+    print(f"DEBUG: Votes by option: {votes_by_option}")
 
     # Check if any option has 100% consensus
     total_participants = len(participants)
@@ -291,12 +299,14 @@ async def check_voting_consensus(trip_id: str, db: Session):
             break
 
     if winning_option:
+        print(f"DEBUG: Winning option found: {winning_option}")
         # Check if detailed plan already exists
         existing_plan = db.query(Message).filter(
             Message.trip_id == trip_id,
             Message.type == "detailed_plan").first()
 
         if not existing_plan:
+            print(f"DEBUG: No existing plan found, generating detailed plan")
             # Generate detailed plan
             await generate_detailed_trip_plan(trip_id, winning_option, db)
 
@@ -312,6 +322,14 @@ async def check_availability_consensus(trip_id: str, db: Session):
     if not participants or not availability:
         return
 
+    # Find participants who have submitted any availability data
+    participants_with_availability = set(avail.user_id for avail in availability)
+    
+    # Only consider participants who have submitted availability data
+    # This prevents users who haven't marked any dates from blocking consensus
+    if len(participants_with_availability) < 2:
+        return
+
     # Group availability by date
     availability_by_date = {}
     for avail in availability:
@@ -320,8 +338,8 @@ async def check_availability_consensus(trip_id: str, db: Session):
             availability_by_date[date_str] = []
         availability_by_date[date_str].append(avail)
 
-    # Find dates where everyone is available
-    total_participants = len(participants)
+    # Find dates where everyone (who has submitted data) is available
+    total_participants_with_data = len(participants_with_availability)
     consensus_dates = []
 
     for date_str, date_availability in availability_by_date.items():
@@ -330,7 +348,7 @@ async def check_availability_consensus(trip_id: str, db: Session):
                                      for avail in date_availability
                                      if avail.available)
 
-        if len(available_participants) == total_participants:
+        if len(available_participants) == total_participants_with_data:
             consensus_dates.append(date_str)
 
     # Check if we have enough consensus dates (3 or more)
@@ -342,12 +360,22 @@ async def generate_trip_options_internal(trip_id: str, consensus_dates: list,
                                          db: Session):
     """Internal function to generate trip options when consensus is reached."""
     try:
+        print(f"DEBUG: Generating trip options for trip {trip_id}")
         # Get trip details
         trip = db.query(Trip).filter(Trip.trip_id == trip_id).first()
         if not trip:
             return
 
-        # Create trip options
+        # Check if consensus message already exists
+        existing_message = db.query(Message).filter(
+            Message.trip_id == trip_id,
+            Message.type == "agent",
+            Message.content.like("%Consensus Reached%")).first()
+        
+        if existing_message:
+            return
+
+        # Create trip options data
         options = [{
             "option_id": "cultural",
             "type": "itinerary",
@@ -395,57 +423,62 @@ async def generate_trip_options_internal(trip_id: str, consensus_dates: list,
             }
         }]
 
-        # Save options to database
-        for option_data in options:
-            db_option = TripOption(trip_id=trip_id,
-                                   option_id=option_data["option_id"],
-                                   type=option_data["type"],
-                                   title=option_data["title"],
-                                   description=option_data["description"],
-                                   price=option_data["price"],
-                                   image=option_data["image"],
-                                   meta_data=option_data["meta_data"])
-            db.add(db_option)
-
-        # Create system message about consensus
+        # Create agent message with options in metadata
         consensus_message = f"🎉 **Consensus Reached!**\n\nGreat news! Everyone is available on {len(consensus_dates)} dates. I've found the perfect overlap in your schedules and generated 3 fantastic itinerary options for your Barcelona trip.\n\n📅 **Available dates for everyone:**\n" + "\n".join(
             f"• {date}" for date in
             consensus_dates[:3]) + "\n\nVote for your favorite option below!"
 
         db_message = Message(trip_id=trip_id,
-                             user_id=None,
-                             type="system",
-                             content=consensus_message)
+                           user_id=None,
+                           type="agent",
+                           content=consensus_message,
+                           meta_data={
+                               "type": "trip_options",
+                               "options": options,
+                               "consensus_dates": consensus_dates
+                           })
+        
         db.add(db_message)
 
         # Update trip state
         trip.state = "VOTING_HIGH_LEVEL"
+        
         db.commit()
 
-        # Broadcast the consensus reached event
+        # Refresh the message to get the ID
+        db.refresh(db_message)
+
+        # Broadcast the new message
+        # message_dict = schemas.Message.from_orm(db_message).dict()
+        message_dict = {
+            "content": db_message.content,
+            "type": db_message.type,
+            "metadata": db_message.meta_data,
+            "id": db_message.id,
+            "trip_id": db_message.trip_id,
+            "user_id": db_message.user_id,
+            "timestamp": db_message.timestamp.isoformat()  # Convert datetime to string
+        }
+
+        print(f"DEBUG: Broadcasting new message: {message_dict}")
+        
         await manager.broadcast_to_trip(
             trip_id, {
-                "type":
-                "consensus_reached",
-                "message":
-                schemas.Message.from_orm(db_message).dict(),
-                "options": [
-                    schemas.TripOption.from_orm(opt).dict()
-                    for opt in db.query(TripOption).filter(
-                        TripOption.trip_id == trip_id).all()
-                ],
-                "timestamp":
-                datetime.utcnow().isoformat()
+                "type": "new_message",
+                "message": message_dict,
+                "timestamp": datetime.utcnow().isoformat()
             })
 
     except Exception as e:
-        print(f"Error generating trip options: {e}")
+        import traceback
+        traceback.print_exc()
 
 
 async def generate_detailed_trip_plan(trip_id: str, winning_option: TripOption,
                                       db: Session):
     """Generate detailed trip plan using OpenAI for the winning option."""
     try:
+        print(f"DEBUG: Generating detailed trip plan for trip {trip_id}")
         # Get trip details
         trip = db.query(Trip).filter(Trip.trip_id == trip_id).first()
         if not trip:
@@ -739,6 +772,49 @@ async def set_availability(trip_id: str,
     return {"success": True}
 
 
+@app.post("/api/trips/{trip_id}/availability/batch")
+async def set_availability_batch(trip_id: str,
+                                 batch: schemas.DateAvailabilityBatchCreate,
+                                 db: Session = Depends(get_db)):
+    """Set multiple availability dates for a user at once."""
+    user_id = batch.user_id
+    
+    # Process all dates in the batch
+    for date_availability in batch.dates:
+        # Check if availability already exists
+        existing = db.query(DateAvailability).filter(
+            DateAvailability.trip_id == trip_id,
+            DateAvailability.user_id == user_id,
+            DateAvailability.date == date_availability.date).first()
+
+        if existing:
+            existing.available = date_availability.available
+        else:
+            db_availability = DateAvailability(
+                trip_id=trip_id,
+                user_id=user_id,
+                date=date_availability.date,
+                available=date_availability.available
+            )
+            db.add(db_availability)
+
+    db.commit()
+
+    # Check for availability consensus after updating all dates
+    await check_availability_consensus(trip_id, db)
+
+    # Broadcast batch availability update
+    await manager.broadcast_to_trip(
+        trip_id, {
+            "type": "availability_batch_update",
+            "user_id": user_id,
+            "dates_count": len(batch.dates),
+            "timestamp": datetime.utcnow().isoformat()
+        })
+
+    return {"success": True, "updated_dates": len(batch.dates)}
+
+
 @app.get("/api/trips/{trip_id}/availability",
          response_model=list[schemas.DateAvailability])
 async def get_availability(trip_id: str, db: Session = Depends(get_db)):
@@ -856,158 +932,6 @@ async def get_missing_preferences(trip_id: str, db: Session = Depends(get_db)):
             })
 
     return {"missing_preferences": missing_users}
-
-
-@app.post("/api/trips/{trip_id}/generate-options")
-async def generate_trip_options(trip_id: str, db: Session = Depends(get_db)):
-    # Get trip details
-    trip = db.query(Trip).filter(Trip.trip_id == trip_id).first()
-    if not trip:
-        raise HTTPException(status_code=404, detail="Trip not found")
-
-    # Check if options already exist
-    # existing_options = db.query(TripOption).filter(
-    #     TripOption.trip_id == trip_id
-    # ).count()
-
-    # if existing_options > 0:
-    #     return {"success": False, "message": "Options already generated"}
-
-    # Get all participants preferences
-    preferences = db.query(UserPreferences).filter(
-        UserPreferences.trip_id == trip_id).all()
-
-    # Get availability data
-    availability = db.query(DateAvailability).filter(
-        DateAvailability.trip_id == trip_id).all()
-
-    # Find dates where everyone is available
-    date_counts = {}
-    total_participants = db.query(TripParticipant).filter(
-        TripParticipant.trip_id == trip_id).count()
-
-    for avail in availability:
-        if avail.available:
-            date_str = avail.date.strftime("%Y-%m-%d")
-            date_counts[date_str] = date_counts.get(date_str, 0) + 1
-
-    # Get dates where everyone is available
-    consensus_dates = [
-        date for date, count in date_counts.items()
-        if count == total_participants
-    ]
-
-    # if len(consensus_dates) < 3:
-    #     return {"error": "Not enough consensus dates to plan a trip"}
-
-    # Mock options for now
-    options = [{
-        "option_id": "bcn-option-1",
-        "type": "itinerary",
-        "title": "Cultural Barcelona Explorer",
-        "description":
-        "Perfect for art lovers and history buffs. Includes Sagrada Familia, Park Güell, Gothic Quarter tours, and world-class museums.",
-        "price": 1150,
-        "image":
-        "https://images.unsplash.com/photo-1523531294919-4bcd7c65e216?w=400",
-        "meta_data": {
-            "highlights": [
-                "Sagrada Familia Skip-the-line", "Gothic Quarter Walking Tour",
-                "Picasso Museum", "Tapas Tasting"
-            ],
-            "duration":
-            "5 days",
-            "accommodation":
-            "4-star hotel in Eixample"
-        }
-    }, {
-        "option_id": "bcn-option-2",
-        "type": "itinerary",
-        "title": "Beach & Nightlife Experience",
-        "description":
-        "Sun, sand, and Barcelona's famous nightlife. Beach activities, rooftop bars, and the best clubs in the city.",
-        "price": 1200,
-        "image":
-        "https://images.unsplash.com/photo-1539037116277-4db20889f2d4?w=400",
-        "meta_data": {
-            "highlights": [
-                "Beach Day at Barceloneta", "Rooftop Bar Tour",
-                "Flamenco Show", "Nightclub VIP Access"
-            ],
-            "duration":
-            "5 days",
-            "accommodation":
-            "Beachfront hotel"
-        }
-    }, {
-        "option_id": "bcn-option-3",
-        "type": "itinerary",
-        "title": "Balanced Barcelona Adventure",
-        "description":
-        "The best of both worlds - culture by day, fun by night. A perfect mix of sightseeing, food, and entertainment.",
-        "price": 1175,
-        "image":
-        "https://images.unsplash.com/photo-1558642084-fd07fae5282e?w=400",
-        "meta_data": {
-            "highlights": [
-                "La Rambla & Boqueria Market", "Cable Car to Montjuïc",
-                "Beach Afternoon", "Tapas & Wine Tour"
-            ],
-            "duration":
-            "5 days",
-            "accommodation":
-            "Boutique hotel in El Born"
-        }
-    }]
-
-    # Save options to database
-    # for opt in options:
-    #     # Check if option already exists
-    #     existing = db.query(TripOption).filter(
-    #         TripOption.trip_id == trip_id,
-    #         TripOption.option_id == opt["option_id"]).first()
-
-    #     if not existing:
-    #         db_option = TripOption(trip_id=trip_id, **opt)
-    #         db.add(db_option)
-
-    # # Check if options message already exists
-    # existing_message = db.query(Message).filter(
-    #     Message.trip_id == trip_id, Message.type == "agent",
-    #     Message.content.like("%3 fantastic itinerary options%")).first()
-
-    # if not existing_message:
-    #     # Add AI message
-    ai_message = Message(
-        trip_id=trip_id,
-        user_id=None,
-        type="agent",
-        content=
-        f"Great! I can see everyone has shared their availability. I found {len(consensus_dates)} dates where everyone is available. Based on your preferences - {', '.join([f'{pref.budget_preference} budget, {pref.accommodation_type} accommodation, {pref.travel_style} travel style' for pref in preferences])}, I have 3 fantastic itinerary options for Barcelona. Let me know which one excites you most!"
-    )
-    db.add(ai_message)
-
-    # Update trip state
-    trip.state = "VOTING_HIGH_LEVEL"
-
-    db.commit()
-
-    # Broadcast updates
-    await manager.broadcast_to_trip(trip_id, {
-        "type": "options_generated",
-        "timestamp": datetime.utcnow().isoformat()
-    })
-
-    await manager.broadcast_to_trip(trip_id, {
-        "type": "new_message",
-        "timestamp": datetime.utcnow().isoformat()
-    })
-
-    return {
-        "success": True,
-        "consensus_dates": consensus_dates,
-        "options_count": len(options)
-    }
 
 
 @app.post("/api/reset-carol")
@@ -1189,6 +1113,28 @@ async def reset_carol(request: dict, db: Session = Depends(get_db)):
                                          datetime(2024, 10, 16)
                                      ])
         db.add(bob_avail)
+
+    # Clear existing votes
+    db.query(Vote).filter(Vote.trip_id == trip_id).delete()
+    
+    # Add votes for Alice and Bob on the first option ("cultural")
+    alice_vote = Vote(
+        trip_id=trip_id,
+        user_id=1,  # Alice
+        option_id="cultural",
+        emoji="👍"
+    )
+    db.add(alice_vote)
+    
+    bob_vote = Vote(
+        trip_id=trip_id,
+        user_id=2,  # Bob
+        option_id="cultural",
+        emoji="👍"
+    )
+    db.add(bob_vote)
+    
+    db.commit()
 
     db.commit()
 
@@ -1447,4 +1393,4 @@ else:
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=5000)
+    uvicorn.run(app, host="0.0.0.0", port=5001)

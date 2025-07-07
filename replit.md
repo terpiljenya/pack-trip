@@ -108,7 +108,7 @@ The application uses a PostgreSQL database with the following main entities:
   - Backend API ready at port 8000 (requires manual startup)
 - July 06, 2025. Completed switch to Python backend:
   - Removed Express server folder
-  - Updated FastAPI to serve frontend and API on port 5000
+  - Updated FastAPI to serve frontend and API on port 5001
   - Created dev.py script to run both Vite and FastAPI
   - Python backend now running (manual start required)
   - Note: Workflow configuration needs manual update

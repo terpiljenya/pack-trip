@@ -1,7 +1,9 @@
 import os
 import sys
+from dotenv import load_dotenv
 from sqlalchemy import create_engine, text
 
+load_dotenv()
 # Test database connection
 DATABASE_URL = os.environ.get("DATABASE_URL", "")
 print(f"Testing connection to: {DATABASE_URL[:50]}...")

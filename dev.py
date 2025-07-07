@@ -4,6 +4,9 @@ import sys
 import os
 import signal
 import time
+from dotenv import load_dotenv
+
+load_dotenv()
 
 # Handle Ctrl+C gracefully
 def signal_handler(sig, frame):
@@ -28,14 +31,14 @@ if __name__ == "__main__":
     time.sleep(2)
 
     # Start FastAPI in the main thread
-    print("Starting FastAPI backend on port 5000...")
+    print("Starting FastAPI backend on port 5001...")
     import uvicorn
 
     try:
         uvicorn.run(
             "backend.main:app",
             host="0.0.0.0",
-            port=5000,
+            port=5001,
             reload=True,
             log_level="info"
         )
