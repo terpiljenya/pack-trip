@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Calendar, Clock, MapPin, ChevronDown, ChevronUp, DollarSign, Image as ImageIcon } from 'lucide-react';
 import QuickVoteChips from './QuickVoteChips';
-import { generateItineraryImage } from '@/lib/ai-image-generator';
+// import { generateItineraryImage } from '@/lib/ai-image-generator';
 
 interface ItineraryCardProps {
   option: {
@@ -89,15 +89,15 @@ export default function ItineraryCard({
     try {
       // Extract destination from title or use a default
       const destination = option.title.includes('Barcelona') ? 'Barcelona' : 'Barcelona';
-      const imageUrl = await generateItineraryImage(
-        option.title,
-        option.description,
-        destination
-      );
+      // const imageUrl = await generateItineraryImage(
+      //   option.title,
+      //   option.description,
+      //   destination
+      // );
       
-      if (imageUrl) {
-        setAiImage(imageUrl);
-      }
+      // if (imageUrl) {
+      //   setAiImage(imageUrl);
+      // }
     } catch (error) {
       console.error('Failed to generate AI image:', error);
     } finally {

@@ -325,6 +325,103 @@ async def join_trip(trip_id: str,
     return {"user_id": user_id, "message": "Successfully joined trip"}
 
 
+@app.post("/api/trips/{trip_id}/join-demo")
+async def join_demo_trip(trip_id: str,
+                         user_info: dict,
+                         db: Session = Depends(get_db)):
+    """Join a demo trip without requiring invite token"""
+    # Only allow joining the Barcelona demo trip
+    if trip_id != "BCN-2024-001":
+        raise HTTPException(status_code=404, detail="Demo trip not found")
+    
+    # Verify the demo trip exists
+    trip = db.query(Trip).filter(Trip.trip_id == trip_id).first()
+    if not trip:
+        raise HTTPException(status_code=404, detail="Demo trip not found")
+
+    # Create or get user
+    display_name = user_info.get("display_name", "").strip()
+    home_city = user_info.get(
+        "home_city", "").strip() if user_info.get("home_city") else None
+    if not display_name:
+        raise HTTPException(status_code=400, detail="Display name is required")
+
+    # For demo, always create a new user to avoid conflicts
+    # Generate unique username
+    username = display_name.lower().replace(" ", "_")
+    counter = 1
+    original_username = username
+
+    # Ensure unique username
+    while db.query(User).filter(User.username == username).first():
+        username = f"{original_username}_{counter}"
+        counter += 1
+
+    # Generate a random color for the user
+    colors = [
+        "#3B82F6", "#10B981", "#8B5CF6", "#F59E0B", "#EF4444", "#06B6D4",
+        "#84CC16", "#EC4899"
+    ]
+    user_color = secrets.choice(colors)
+
+    # Create new user for demo
+    new_user = User(
+        username=username,
+        password="",  # No password needed for demo
+        display_name=display_name,
+        color=user_color,
+        home_city=home_city)
+    db.add(new_user)
+    db.commit()
+    db.refresh(new_user)
+    user_id = new_user.id
+
+    # Add user as participant
+    participant = TripParticipant(trip_id=trip_id,
+                                  user_id=user_id,
+                                  role="traveler",
+                                  has_submitted_preferences=False,
+                                  has_submitted_availability=False)
+    db.add(participant)
+
+    # Create join message
+    join_message = Message(
+        trip_id=trip_id,
+        user_id=None,
+        type="system",
+        content=f"{display_name} has joined the trip planning!")
+    db.add(join_message)
+
+    db.commit()
+
+    # Broadcast new join message
+    db.refresh(join_message)
+    await manager.broadcast_to_trip(
+        trip_id, {
+            "type": "new_message",
+            "message": {
+                "id": join_message.id,
+                "trip_id": join_message.trip_id,
+                "user_id": join_message.user_id,
+                "type": join_message.type,
+                "content": join_message.content,
+                "timestamp": join_message.timestamp.isoformat()
+            },
+            "timestamp": datetime.utcnow().isoformat()
+        })
+
+    # Also broadcast user joined event
+    await manager.broadcast_to_trip(
+        trip_id, {
+            "type": "user_joined",
+            "user_id": user_id,
+            "display_name": display_name,
+            "timestamp": datetime.utcnow().isoformat()
+        })
+
+    return {"user_id": user_id, "message": "Successfully joined demo trip"}
+
+
 @app.post("/api/trips", response_model=schemas.Trip)
 async def create_trip(trip: schemas.TripCreate, db: Session = Depends(get_db)):
     # Generate unique invite token
@@ -1261,7 +1358,7 @@ async def reset_carol(request: dict, db: Session = Depends(get_db)):
         Message(trip_id=trip_id,
                 user_id=None,
                 type="system",
-                content="Carol Williams has joined the trip planning"),
+                content="A new traveler has joined the trip planning"),
         Message(
             trip_id=trip_id,
             user_id=2,
@@ -1279,7 +1376,7 @@ async def reset_carol(request: dict, db: Session = Depends(get_db)):
             user_id=None,
             type="agent",
             content=
-            "Great to have everyone here! I see we're planning for October with a budget of around $1,200 per person for 5 days. To create the perfect itinerary for your group, I'll need to understand everyone's preferences.\n\nAlice and Bob - you've shared your travel styles, and I see Carol just joined us. Carol, could you share your preferences too?"
+            "Great to have everyone here! I see we're planning for October with a budget of around $1,200 per person for 5 days. To create the perfect itinerary for your group, I'll need to understand everyone's preferences.\n\nAlice and Bob have shared their travel styles. When other travelers join, please share your preferences too so I can create the perfect trip for everyone!"
         ),
         Message(
             trip_id=trip_id,
@@ -1319,7 +1416,7 @@ async def reset_carol(request: dict, db: Session = Depends(get_db)):
             user_id=None,
             type="agent",
             content=
-            "Great! I have Alice and Bob's preferences. Carol, when you join, please share your travel preferences so I can create the perfect trip for everyone!"
+            "Great! I have Alice and Bob's preferences. When new travelers join, please share your travel preferences so I can create the perfect trip for everyone!"
         )
     ]
 
@@ -1396,24 +1493,6 @@ async def reset_carol(request: dict, db: Session = Depends(get_db)):
                                          datetime(2025, 10, 16)
                                      ])
         db.add(bob_avail)
-
-    # Clear existing votes
-    db.query(Vote).filter(Vote.trip_id == trip_id).delete()
-
-    # Add votes for Alice and Bob on the first option ("cultural")
-    alice_vote = Vote(
-        trip_id=trip_id,
-        user_id=1,  # Alice
-        option_id="option_1",
-        emoji="👍")
-    db.add(alice_vote)
-
-    bob_vote = Vote(
-        trip_id=trip_id,
-        user_id=2,  # Bob
-        option_id="option_1",
-        emoji="👍")
-    db.add(bob_vote)
 
     db.commit()
 
@@ -1599,7 +1678,7 @@ async def startup_event():
             user_id=None,
             type="agent",
             content=
-            "Great! I have Alice and Bob's preferences. Carol, when you join, please share your travel preferences so I can create the perfect trip for everyone!"
+            "Great! I have Alice and Bob's preferences. When new travelers join, please share your travel preferences so I can create the perfect trip for everyone!"
         )
     ]
 

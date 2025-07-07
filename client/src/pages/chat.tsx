@@ -1,4 +1,4 @@
-import { useParams } from "wouter";
+import { useParams, useLocation } from "wouter";
 import { useTripState } from "@/hooks/useTripState";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useState, useEffect, useRef } from "react";
@@ -10,6 +10,8 @@ import {
   Menu,
   X,
   RotateCw,
+  ArrowLeft,
+  Home,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
@@ -25,6 +27,7 @@ import { Trip } from "../../../shared/schema";
 
 export default function ChatPage() {
   const params = useParams();
+  const [location, setLocation] = useLocation();
   const tripId = params.tripId;
   
   // Get user session from localStorage
@@ -159,15 +162,23 @@ export default function ChatPage() {
       {isMobile && (
         <div className="bg-white border-b border-slate-200 px-4 py-3 flex items-center justify-between">
           <div className="flex items-center space-x-3">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setLocation("/")}
+              className="mr-2"
+            >
+              <ArrowLeft className="w-5 h-5" />
+            </Button>
             <div className="w-10 h-10 bg-primary rounded-full flex items-center justify-center">
               <Plane className="w-5 h-5 text-white" />
             </div>
-                          <div>
-                <h1 className="text-lg font-semibold text-slate-900">
-                  {tripData?.title || "PackTrip AI"}
-                </h1>
-                <p className="text-xs text-slate-500">{tripData?.destination || "Trip Planning"}</p>
-              </div>
+            <div>
+              <h1 className="text-lg font-semibold text-slate-900">
+                {tripData?.title || "PackTrip AI"}
+              </h1>
+              <p className="text-xs text-slate-500">{tripData?.destination || "Trip Planning"}</p>
+            </div>
           </div>
           <Sheet open={isDrawerOpen} onOpenChange={setIsDrawerOpen}>
             <SheetTrigger asChild>
@@ -195,6 +206,15 @@ export default function ChatPage() {
         {!isMobile && (
           <div className="bg-white border-b border-slate-200 px-6 py-4 flex items-center justify-between">
             <div className="flex items-center space-x-4">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setLocation("/")}
+                className="mr-2"
+              >
+                <Home className="w-4 h-4 mr-2" />
+                Back to Home
+              </Button>
               <div className="w-12 h-12 bg-primary rounded-2xl flex items-center justify-center">
                 <Plane className="w-6 h-6 text-white" />
               </div>

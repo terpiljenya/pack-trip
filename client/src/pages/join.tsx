@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Plane, Users, MapPin, Loader2 } from "lucide-react";
+import { Plane, Users, MapPin, Loader2, ArrowLeft } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 
@@ -20,8 +20,17 @@ export default function JoinPage() {
   const tripId = params.tripId;
   const urlParams = new URLSearchParams(window.location.search);
   const token = urlParams.get("token");
+  const isDemo = urlParams.get("demo") === "true";
 
-  // Fetch trip info to validate invite link
+  // Demo trip info for Barcelona
+  const demoTripInfo = {
+    title: "Barcelona Trip Planning",
+    destination: "Barcelona",
+    participant_count: 2,
+    budget: 1200
+  };
+
+  // Fetch trip info to validate invite link (skip for demo)
   const { data: tripInfo, isLoading, error } = useQuery({
     queryKey: [`/api/trips/${tripId}/join-info`],
     queryFn: async () => {
@@ -31,7 +40,7 @@ export default function JoinPage() {
       }
       return response.json();
     },
-    enabled: !!tripId && !!token,
+    enabled: !!tripId && !!token && !isDemo,
     retry: false,
   });
 
@@ -48,7 +57,11 @@ export default function JoinPage() {
   // Join trip mutation
   const joinMutation = useMutation({
     mutationFn: async (userInfo: { display_name: string; home_city?: string }) => {
-      const response = await apiRequest("POST", `/api/trips/${tripId}/join?token=${token}`, userInfo);
+      const endpoint = isDemo 
+        ? `/api/trips/${tripId}/join-demo`
+        : `/api/trips/${tripId}/join?token=${token}`;
+      
+      const response = await apiRequest("POST", endpoint, userInfo);
       if (!response.ok) {
         const errorData = await response.json();
         throw new Error(errorData.detail || "Failed to join trip");
@@ -57,9 +70,10 @@ export default function JoinPage() {
     },
     onSuccess: (data) => {
       storeUserSession(data.user_id, displayName, homeCity);
+      const tripTitle = isDemo ? demoTripInfo.title : tripInfo?.title;
       toast({
         title: "Welcome to the trip!",
-        description: `You've successfully joined ${tripInfo?.title}`,
+        description: `You've successfully joined ${tripTitle}`,
       });
       setLocation(`/trip/${tripId}`);
     },
@@ -95,7 +109,8 @@ export default function JoinPage() {
     }
   };
 
-  if (!tripId || !token) {
+  // For demo trips, skip token validation
+  if (!tripId || (!token && !isDemo)) {
     return (
       <div className="min-h-screen bg-gradient-to-b from-blue-50 to-white flex items-center justify-center p-4">
         <Card className="w-full max-w-md">
@@ -113,7 +128,8 @@ export default function JoinPage() {
     );
   }
 
-  if (isLoading) {
+  // Skip loading state for demo trips
+  if (isLoading && !isDemo) {
     return (
       <div className="min-h-screen bg-gradient-to-b from-blue-50 to-white flex items-center justify-center p-4">
         <Card className="w-full max-w-md">
@@ -128,7 +144,8 @@ export default function JoinPage() {
     );
   }
 
-  if (error || !tripInfo) {
+  // For regular trips, show error if needed
+  if ((error || !tripInfo) && !isDemo) {
     return (
       <div className="min-h-screen bg-gradient-to-b from-blue-50 to-white flex items-center justify-center p-4">
         <Card className="w-full max-w-md">
@@ -153,36 +170,64 @@ export default function JoinPage() {
     );
   }
 
+  // Use demo trip info if it's a demo, otherwise use fetched trip info
+  const currentTripInfo = isDemo ? demoTripInfo : tripInfo;
+
   return (
     <div className="min-h-screen bg-gradient-to-b from-blue-50 to-white flex items-center justify-center p-4">
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
-          <div className="w-16 h-16 bg-blue-600 rounded-full flex items-center justify-center mx-auto mb-4">
-            <Plane className="w-8 h-8 text-white" />
+          <div className="flex items-center justify-center mb-4">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setLocation("/")}
+              className="absolute left-4 top-4"
+            >
+              <ArrowLeft className="w-4 h-4 mr-2" />
+              Back
+            </Button>
+            <div className="w-16 h-16 bg-blue-600 rounded-full flex items-center justify-center">
+              <Plane className="w-8 h-8 text-white" />
+            </div>
           </div>
-          <CardTitle className="text-2xl">Join Trip</CardTitle>
+          <CardTitle className="text-2xl">
+            {isDemo ? "Join Demo Trip" : "Join Trip"}
+          </CardTitle>
           <CardDescription>
-            You've been invited to join a trip
+            {isDemo 
+              ? "Experience PackTrip AI with our Barcelona demo"
+              : "You've been invited to join a trip"
+            }
           </CardDescription>
         </CardHeader>
         
         <CardContent className="space-y-6">
           {/* Trip Info */}
-          <div className="bg-blue-50 rounded-lg p-4 space-y-3">
-            <h3 className="font-semibold text-blue-900">{tripInfo.title}</h3>
-            <div className="flex items-center space-x-4 text-sm text-blue-700">
+          <div className={`${isDemo ? 'bg-orange-50 border border-orange-200' : 'bg-blue-50'} rounded-lg p-4 space-y-3`}>
+            <div className="flex items-center space-x-2">
+              <h3 className={`font-semibold ${isDemo ? 'text-orange-900' : 'text-blue-900'}`}>
+                {currentTripInfo?.title}
+              </h3>
+              {isDemo && (
+                <span className="text-xs bg-orange-200 text-orange-800 px-2 py-1 rounded-full">
+                  DEMO
+                </span>
+              )}
+            </div>
+            <div className={`flex items-center space-x-4 text-sm ${isDemo ? 'text-orange-700' : 'text-blue-700'}`}>
               <div className="flex items-center space-x-1">
                 <MapPin className="w-4 h-4" />
-                <span>{tripInfo.destination}</span>
+                <span>{currentTripInfo?.destination}</span>
               </div>
               <div className="flex items-center space-x-1">
                 <Users className="w-4 h-4" />
-                <span>{tripInfo.participant_count} travelers</span>
+                <span>{currentTripInfo?.participant_count} travelers</span>
               </div>
             </div>
-            {tripInfo.budget && (
-              <div className="text-sm text-blue-700">
-                Budget: ${tripInfo.budget} per person
+            {currentTripInfo?.budget && (
+              <div className={`text-sm ${isDemo ? 'text-orange-700' : 'text-blue-700'}`}>
+                Budget: ${currentTripInfo.budget} per person
               </div>
             )}
           </div>
@@ -225,13 +270,18 @@ export default function JoinPage() {
                   Joining...
                 </>
               ) : (
-                "Join Trip"
+                isDemo ? "Join Demo Trip" : "Join Trip"
               )}
             </Button>
           </form>
           
           <div className="text-center text-sm text-gray-500">
-            <p>No password required - just your name to get started!</p>
+            <p>
+              {isDemo 
+                ? "No signup required - explore PackTrip AI instantly!"
+                : "No password required - just your name to get started!"
+              }
+            </p>
           </div>
         </CardContent>
       </Card>

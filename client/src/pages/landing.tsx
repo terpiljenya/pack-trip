@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Plane, Users, Calendar, MapPin, Sparkles, Plus, ArrowRight } from "lucide-react";
+import { Plane, MapPin, Plus, ArrowRight } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 
@@ -144,90 +144,70 @@ export default function LandingPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-blue-50 to-white">
-      {/* Header */}
-      <div className="container mx-auto px-4 py-8">
+    <div className="min-h-screen bg-gradient-to-b from-blue-50 to-white flex items-center justify-center p-4">
+      <div className="w-full max-w-2xl">
+        {/* Header */}
         <div className="text-center mb-12">
-          <div className="flex items-center justify-center mb-4">
-            <div className="w-16 h-16 bg-blue-600 rounded-full flex items-center justify-center">
-              <Plane className="w-8 h-8 text-white" />
+          <div className="flex items-center justify-center mb-6">
+            <div className="w-20 h-20 bg-blue-600 rounded-full flex items-center justify-center">
+              <Plane className="w-10 h-10 text-white" />
             </div>
           </div>
-          <h1 className="text-4xl font-bold text-gray-900 mb-4">
+          <h1 className="text-5xl font-bold text-gray-900 mb-4">
             PackTrip AI
           </h1>
-          <p className="text-xl text-gray-600 max-w-2xl mx-auto">
+          <p className="text-xl text-gray-600 max-w-xl mx-auto">
             The first group travel concierge that listens to everyone's preferences 
             and creates the perfect trip for your crew
           </p>
         </div>
 
-        {/* Features */}
-        <div className="grid md:grid-cols-3 gap-6 mb-12">
-          <Card className="text-center">
-            <CardContent className="pt-6">
-              <Users className="w-12 h-12 text-blue-600 mx-auto mb-4" />
-              <h3 className="text-lg font-semibold mb-2">Smart Collaboration</h3>
-              <p className="text-gray-600">
-                Everyone shares their preferences and availability in real-time
-              </p>
-            </CardContent>
-          </Card>
-          
-          <Card className="text-center">
-            <CardContent className="pt-6">
-              <Calendar className="w-12 h-12 text-blue-600 mx-auto mb-4" />
-              <h3 className="text-lg font-semibold mb-2">Date Coordination</h3>
-              <p className="text-gray-600">
-                Find dates that work for everyone with our smart calendar
-              </p>
-            </CardContent>
-          </Card>
-          
-          <Card className="text-center">
-            <CardContent className="pt-6">
-              <Sparkles className="w-12 h-12 text-blue-600 mx-auto mb-4" />
-              <h3 className="text-lg font-semibold mb-2">AI-Powered Plans</h3>
-              <p className="text-gray-600">
-                Get personalized itineraries that balance everyone's interests
-              </p>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* CTA Section */}
-        <div className="text-center">
-          <Card className="max-w-lg mx-auto">
-            <CardContent className="pt-8 pb-8">
-              <h2 className="text-2xl font-bold text-gray-900 mb-4">
-                Ready to plan your next adventure?
-              </h2>
-              <p className="text-gray-600 mb-6">
-                Create a new trip and invite your friends to start planning together
-              </p>
-              <Button
-                onClick={() => setShowCreateForm(true)}
-                size="lg"
-                className="w-full"
-              >
-                <Plus className="w-5 h-5 mr-2" />
+        {/* Two Main Options */}
+        <div className="grid md:grid-cols-2 gap-6">
+          {/* Create New Trip */}
+          <Card className="cursor-pointer hover:shadow-lg transition-shadow" onClick={() => setShowCreateForm(true)}>
+            <CardContent className="pt-8 pb-8 text-center">
+              <div className="w-16 h-16 bg-blue-600 rounded-full flex items-center justify-center mx-auto mb-4">
+                <Plus className="w-8 h-8 text-white" />
+              </div>
+              <h3 className="text-xl font-semibold text-gray-900 mb-2">
                 Create New Trip
+              </h3>
+              <p className="text-gray-600 mb-6">
+                Start planning a new adventure with your friends
+              </p>
+              <Button size="lg" className="w-full">
+                Get Started
+                <ArrowRight className="w-4 h-4 ml-2" />
+              </Button>
+            </CardContent>
+          </Card>
+
+          {/* Join Demo Trip */}
+          <Card className="cursor-pointer hover:shadow-lg transition-shadow" onClick={() => setLocation("/join/BCN-2024-001?demo=true")}>
+            <CardContent className="pt-8 pb-8 text-center">
+              <div className="w-16 h-16 bg-orange-500 rounded-full flex items-center justify-center mx-auto mb-4">
+                <MapPin className="w-8 h-8 text-white" />
+              </div>
+              <h3 className="text-xl font-semibold text-gray-900 mb-2">
+                Try Demo Trip
+              </h3>
+              <p className="text-gray-600 mb-6">
+                Experience PackTrip AI with our Barcelona demo
+              </p>
+              <Button variant="outline" size="lg" className="w-full">
+                Join Barcelona Trip
+                <ArrowRight className="w-4 h-4 ml-2" />
               </Button>
             </CardContent>
           </Card>
         </div>
 
-        {/* Demo Trip */}
-        <div className="text-center mt-8">
-          <p className="text-gray-500 mb-4">or</p>
-          <Button
-            variant="outline"
-            onClick={() => setLocation("/trip/BCN-2024-001")}
-            className="bg-white"
-          >
-            <MapPin className="w-4 h-4 mr-2" />
-            Try Demo Trip (Barcelona)
-          </Button>
+        {/* Footer */}
+        <div className="text-center mt-8 text-gray-500">
+          <p className="text-sm">
+            Smart collaboration • Date coordination • AI-powered plans
+          </p>
         </div>
       </div>
     </div>
