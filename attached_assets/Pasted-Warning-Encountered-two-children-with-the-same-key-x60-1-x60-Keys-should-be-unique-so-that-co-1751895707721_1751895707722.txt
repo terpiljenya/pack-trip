@@ -1,0 +1,75 @@
+Warning: Encountered two children with the same key, &#x60;1&#x60;. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version.
+    at div
+    at div
+    at button
+    at https://27b0753f-1f6e-40f6-acaf-643d30f9ed1f-00-1927p9hwph9o3.kirk.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-EVLBUYTV.js?v=aab96115:79:13
+    at https://27b0753f-1f6e-40f6-acaf-643d30f9ed1f-00-1927p9hwph9o3.kirk.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-EVLBUYTV.js?v=aab96115:56:13
+    at https://27b0753f-1f6e-40f6-acaf-643d30f9ed1f-00-1927p9hwph9o3.kirk.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-BOL2CCOG.js?v=aab96115:42:13
+    at https://27b0753f-1f6e-40f6-acaf-643d30f9ed1f-00-1927p9hwph9o3.kirk.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-EVLBUYTV.js?v=aab96115:79:13
+    at https://27b0753f-1f6e-40f6-acaf-643d30f9ed1f-00-1927p9hwph9o3.kirk.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-EVLBUYTV.js?v=aab96115:56:13
+    at https://27b0753f-1f6e-40f6-acaf-643d30f9ed1f-00-1927p9hwph9o3.kirk.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-BOL2CCOG.js?v=aab96115:42:13
+    at https://27b0753f-1f6e-40f6-acaf-643d30f9ed1f-00-1927p9hwph9o3.kirk.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/@radix-ui_react-tooltip.js?v=aab96115:1981:13
+    at https://27b0753f-1f6e-40f6-acaf-643d30f9ed1f-00-1927p9hwph9o3.kirk.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/@radix-ui_react-tooltip.js?v=aab96115:2383:13
+    at Provider (https://27b0753f-1f6e-40f6-acaf-643d30f9ed1f-00-1927p9hwph9o3.kirk.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-E7IAXTU4.js?v=aab96115:38:15)
+    at Provider (https://27b0753f-1f6e-40f6-acaf-643d30f9ed1f-00-1927p9hwph9o3.kirk.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-E7IAXTU4.js?v=aab96115:38:15)
+    at Popper (https://27b0753f-1f6e-40f6-acaf-643d30f9ed1f-00-1927p9hwph9o3.kirk.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/@radix-ui_react-tooltip.js?v=aab96115:1973:11)
+    at Tooltip (https://27b0753f-1f6e-40f6-acaf-643d30f9ed1f-00-1927p9hwph9o3.kirk.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/@radix-ui_react-tooltip.js?v=aab96115:2292:5)
+    at div
+    at Provider (https://27b0753f-1f6e-40f6-acaf-643d30f9ed1f-00-1927p9hwph9o3.kirk.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-E7IAXTU4.js?v=aab96115:38:15)
+    at TooltipProvider (https://27b0753f-1f6e-40f6-acaf-643d30f9ed1f-00-1927p9hwph9o3.kirk.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/@radix-ui_react-tooltip.js?v=aab96115:2248:5)
+    at div
+    at CalendarMatrix (https://27b0753f-1f6e-40f6-acaf-643d30f9ed1f-00-1927p9hwph9o3.kirk.replit.dev/src/components/chat/CalendarMatrix.tsx:25:3)
+    at div
+    at div
+    at div
+    at ChatMessage (https://27b0753f-1f6e-40f6-acaf-643d30f9ed1f-00-1927p9hwph9o3.kirk.replit.dev/src/components/chat/ChatMessage.tsx?t=1751895448912:26:3)
+    at div
+    at div
+    at div
+    at ChatPage (https://27b0753f-1f6e-40f6-acaf-643d30f9ed1f-00-1927p9hwph9o3.kirk.replit.dev/src/pages/chat.tsx?t=1751895448912:38:18)
+    at Route (https://27b0753f-1f6e-40f6-acaf-643d30f9ed1f-00-1927p9hwph9o3.kirk.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/wouter.js?v=aab96115:323:16)
+    at Switch (https://27b0753f-1f6e-40f6-acaf-643d30f9ed1f-00-1927p9hwph9o3.kirk.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/wouter.js?v=aab96115:379:17)
+    at Router
+    at Provider (https://27b0753f-1f6e-40f6-acaf-643d30f9ed1f-00-1927p9hwph9o3.kirk.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-E7IAXTU4.js?v=aab96115:38:15)
+    at TooltipProvider (https://27b0753f-1f6e-40f6-acaf-643d30f9ed1f-00-1927p9hwph9o3.kirk.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/@radix-ui_react-tooltip.js?v=aab96115:2248:5)
+    at QueryClientProvider (https://27b0753f-1f6e-40f6-acaf-643d30f9ed1f-00-1927p9hwph9o3.kirk.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/@tanstack_react-query.js?v=aab96115:2805:3)
+    at App
+at div
+at div
+at button
+at https://27b0753f-1f6e-40f6-acaf-643d30f9ed1f-00-1927p9hwph9o3.kirk.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-EVLBUYTV.js?v=aab96115:79:13
+at https://27b0753f-1f6e-40f6-acaf-643d30f9ed1f-00-1927p9hwph9o3.kirk.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-EVLBUYTV.js?v=aab96115:56:13
+at https://27b0753f-1f6e-40f6-acaf-643d30f9ed1f-00-1927p9hwph9o3.kirk.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-BOL2CCOG.js?v=aab96115:42:13
+at https://27b0753f-1f6e-40f6-acaf-643d30f9ed1f-00-1927p9hwph9o3.kirk.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-EVLBUYTV.js?v=aab96115:79:13
+at https://27b0753f-1f6e-40f6-acaf-643d30f9ed1f-00-1927p9hwph9o3.kirk.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-EVLBUYTV.js?v=aab96115:56:13
+at https://27b0753f-1f6e-40f6-acaf-643d30f9ed1f-00-1927p9hwph9o3.kirk.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-BOL2CCOG.js?v=aab96115:42:13
+at https://27b0753f-1f6e-40f6-acaf-643d30f9ed1f-00-1927p9hwph9o3.kirk.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/@radix-ui_react-tooltip.js?v=aab96115:1981:13
+at https://27b0753f-1f6e-40f6-acaf-643d30f9ed1f-00-1927p9hwph9o3.kirk.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/@radix-ui_react-tooltip.js?v=aab96115:2383:13
+at Provider (https://27b0753f-1f6e-40f6-acaf-643d30f9ed1f-00-1927p9hwph9o3.kirk.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-E7IAXTU4.js?v=aab96115:38:15)
+at Provider (https://27b0753f-1f6e-40f6-acaf-643d30f9ed1f-00-1927p9hwph9o3.kirk.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-E7IAXTU4.js?v=aab96115:38:15)
+at Popper (https://27b0753f-1f6e-40f6-acaf-643d30f9ed1f-00-1927p9hwph9o3.kirk.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/@radix-ui_react-tooltip.js?v=aab96115:1973:11)
+at Tooltip (https://27b0753f-1f6e-40f6-acaf-643d30f9ed1f-00-1927p9hwph9o3.kirk.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/@radix-ui_react-tooltip.js?v=aab96115:2292:5)
+at div
+at Provider (https://27b0753f-1f6e-40f6-acaf-643d30f9ed1f-00-1927p9hwph9o3.kirk.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-E7IAXTU4.js?v=aab96115:38:15)
+at TooltipProvider (https://27b0753f-1f6e-40f6-acaf-643d30f9ed1f-00-1927p9hwph9o3.kirk.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/@radix-ui_react-tooltip.js?v=aab96115:2248:5)
+at div
+at CalendarMatrix (https://27b0753f-1f6e-40f6-acaf-643d30f9ed1f-00-1927p9hwph9o3.kirk.replit.dev/src/components/chat/CalendarMatrix.tsx:25:3)
+at div
+at div
+at div
+at ChatMessage (https://27b0753f-1f6e-40f6-acaf-643d30f9ed1f-00-1927p9hwph9o3.kirk.replit.dev/src/components/chat/ChatMessage.tsx?t=1751895448912:26:3)
+at div
+at div
+at div
+at ChatPage (https://27b0753f-1f6e-40f6-acaf-643d30f9ed1f-00-1927p9hwph9o3.kirk.replit.dev/src/pages/chat.tsx?t=1751895448912:38:18)
+at Route (https://27b0753f-1f6e-40f6-acaf-643d30f9ed1f-00-1927p9hwph9o3.kirk.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/wouter.js?v=aab96115:323:16)
+at Switch (https://27b0753f-1f6e-40f6-acaf-643d30f9ed1f-00-1927p9hwph9o3.kirk.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/wouter.js?v=aab96115:379:17)
+at Router
+at Provider (https://27b0753f-1f6e-40f6-acaf-643d30f9ed1f-00-1927p9hwph9o3.kirk.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-E7IAXTU4.js?v=aab96115:38:15)
+at TooltipProvider (https://27b0753f-1f6e-40f6-acaf-643d30f9ed1f-00-1927p9hwph9o3.kirk.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/@radix-ui_react-tooltip.js?v=aab96115:2248:5)
+at QueryClientProvider (https://27b0753f-1f6e-40f6-acaf-643d30f9ed1f-00-1927p9hwph9o3.kirk.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/@tanstack_react-query.js?v=aab96115:2805:3)
+at App
+at t.value (https://27b0753f-1f6e-40f6-acaf-643d30f9ed1f-00-1927p9hwph9o3.kirk.replit.dev/__replco/static/devtools/eruda/3.2.3/eruda.js:2:17465)
+at new t (https://27b0753f-1f6e-40f6-acaf-643d30f9ed1f-00-1927p9hwph9o3.kirk.replit.dev/__replco/static/devtools/eruda/3.2.3/eruda.js:2:12630)
+at t.value (https://27b0753f-1f6e-40f6-acaf-643d30f9ed1f-00-1927p9hwph9o3.kirk.replit.dev/__replco/static/devtools/eruda/3.2.3/eruda.js:2:32766)
+at https://27b0753f-1f6e-40f6-acaf-643d30f9ed1f-00-1927p9hwph9o3.kirk.replit.dev/__replco/static/devtools/eruda/3.2.3/eruda.js:2:34400
