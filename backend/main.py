@@ -15,6 +15,7 @@ import secrets
 from .database import get_db, engine
 from .models import Base, User, Trip, TripParticipant, Message, Vote, DateAvailability, UserPreferences
 from . import schemas
+from .ai_agent import AIAgent
 
 # OpenAI integration
 import openai
@@ -25,6 +26,9 @@ openai_client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
 
 # Initialize OpenAI client
 openai_client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+
+# Initialize AI Agent
+ai_agent = AIAgent()
 
 # Create all tables
 Base.metadata.create_all(bind=engine)
@@ -329,7 +333,7 @@ async def create_trip(trip: schemas.TripCreate, db: Session = Depends(get_db)):
         trip_id=trip.trip_id,
         user_id=None,
         type="agent",
-        content=f"Welcome to your {trip.destination} trip! I'm PackTrip AI, your travel concierge. I'll help you plan the perfect trip with your group. To get started, share your travel preferences and invite your friends to join!"
+        content=f"Welcome to your {trip.destination} trip! I'm PackTrip AI, your travel assistant. I'll help you plan the perfect trip with your group. To get started, share your travel preferences and invite your friends to join!"
     )
     db.add(welcome_message)
     
@@ -369,6 +373,89 @@ async def create_message(trip_id: str,
             },
             "timestamp": datetime.utcnow().isoformat()
         })
+
+    # Process message with AI agent if it's a user message
+    if message.type == "user" and message.user_id:
+        try:
+            analysis = await ai_agent.analyze_message(
+                message.content, 
+                trip_id, 
+                message.user_id, 
+                db
+            )
+            
+            # Generate agent response if needed
+            if analysis.get("response_needed") and analysis.get("calendar_response"):
+                calendar_metadata = {
+                    "type": "calendar_suggestion", 
+                    "intent": analysis["intent"]
+                }
+                
+                # Add calendar month/year if extracted
+                if analysis.get("calendar_month"):
+                    calendar_metadata["calendar_month"] = analysis["calendar_month"]
+                if analysis.get("calendar_year"):
+                    calendar_metadata["calendar_year"] = analysis["calendar_year"]
+                
+                agent_message = Message(
+                    trip_id=trip_id,
+                    user_id=None,  # Agent message
+                    type="agent",
+                    content=analysis["calendar_response"],
+                    meta_data=calendar_metadata
+                )
+                db.add(agent_message)
+                db.commit()
+                db.refresh(agent_message)
+                
+                # Broadcast agent response
+                await manager.broadcast_to_trip(
+                    trip_id, {
+                        "type": "new_message",
+                        "message": {
+                            "id": agent_message.id,
+                            "trip_id": agent_message.trip_id,
+                            "user_id": agent_message.user_id,
+                            "type": agent_message.type,
+                            "content": agent_message.content,
+                            "timestamp": agent_message.timestamp.isoformat(),
+                            "metadata": agent_message.meta_data
+                        },
+                        "timestamp": datetime.utcnow().isoformat()
+                    })
+            
+            # Notify about extracted preferences if any
+            if analysis.get("extracted_preferences"):
+                preferences_message = Message(
+                    trip_id=trip_id,
+                    user_id=None,  # Agent message
+                    type="agent",
+                    content=f"✨ I've noted your preferences: {', '.join(analysis['extracted_preferences'].keys())}. These will help me suggest better options for your trip!",
+                    meta_data={"type": "preferences_extracted", "preferences": analysis["extracted_preferences"]}
+                )
+                db.add(preferences_message)
+                db.commit()
+                db.refresh(preferences_message)
+                
+                # Broadcast preferences notification
+                await manager.broadcast_to_trip(
+                    trip_id, {
+                        "type": "new_message",
+                        "message": {
+                            "id": preferences_message.id,
+                            "trip_id": preferences_message.trip_id,
+                            "user_id": preferences_message.user_id,
+                            "type": preferences_message.type,
+                            "content": preferences_message.content,
+                            "timestamp": preferences_message.timestamp.isoformat(),
+                            "metadata": preferences_message.meta_data
+                        },
+                        "timestamp": datetime.utcnow().isoformat()
+                    })
+                    
+        except Exception as e:
+            print(f"Error processing message with AI agent: {e}")
+            # Continue without AI processing if there's an error
 
     return db_message
 
@@ -1235,17 +1322,18 @@ async def reset_carol(request: dict, db: Session = Depends(get_db)):
             content="Barcelona sounds amazing! I've always wanted to visit"),
         Message(
             trip_id=trip_id,
-            user_id=None,
-            type="agent",
-            content=
-            "Great to have everyone here! I see we're planning for October with a budget of around $1,200 per person for 5 days. To create the perfect itinerary for your group, I'll need to understand everyone's preferences.\n\nAlice and Bob - you've shared your travel styles, and I see Carol just joined us. Carol, could you share your preferences too?"
-        ),
-        Message(
-            trip_id=trip_id,
             user_id=1,
             type="user",
             content=
             "I'm thinking October would be perfect - great weather and fewer crowds! Budget of around $1,200 per person for 5 days?"
+        ),
+        Message(
+            trip_id=trip_id,
+            user_id=None,
+            type="agent",
+            meta_data={"type": "calendar_suggestion"},
+            content=
+            "Great to have everyone here! I see we're planning for October with a budget of around $1,200 per person for 5 days. To create the perfect itinerary for your group, I'll need to understand everyone's preferences.\n\nAlice and Bob - you've shared your travel styles, and I see Carol just joined us. Carol, could you share your preferences too?"
         ),
         Message(
             trip_id=trip_id,
@@ -1516,6 +1604,7 @@ async def startup_event():
             trip_id="BCN-2024-001",
             user_id=None,
             type="agent",
+            meta_data={"type": "calendar_suggestion"},
             content=
             "Excellent! Barcelona in October is a fantastic choice. Now let's coordinate your dates - I need everyone to mark their availability on the calendar below. Click on the dates you're available to travel!"
         ),

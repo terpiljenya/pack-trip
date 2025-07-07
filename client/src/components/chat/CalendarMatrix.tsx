@@ -24,6 +24,8 @@ interface CalendarMatrixProps {
   onSetBatchAvailability: (dates: Array<{ date: Date; available: boolean }>) => void;
   userId: number;
   isLoading?: boolean;
+  extractedMonth?: number; // 1-12 if month was extracted from AI
+  extractedYear?: number;  // year if extracted from AI
 }
 
 type DateSelection = {
@@ -36,9 +38,23 @@ export default function CalendarMatrix({
   onSetAvailability,
   onSetBatchAvailability,
   userId,
-  isLoading = false
+  isLoading = false,
+  extractedMonth,
+  extractedYear
 }: CalendarMatrixProps) {
-  const [selectedMonth] = useState(new Date(2024, 9, 1)); // October 2024
+  // Use extracted month/year if available, otherwise default to current month or October 2024
+  const getInitialMonth = () => {
+    if (extractedMonth && extractedYear) {
+      return new Date(extractedYear, extractedMonth - 1, 1); // Month is 0-indexed in Date constructor
+    }
+    if (extractedMonth) {
+      const currentYear = new Date().getFullYear();
+      return new Date(currentYear, extractedMonth - 1, 1);
+    }
+    return new Date(2024, 9, 1); // October 2024 as fallback
+  };
+
+  const [selectedMonth] = useState(getInitialMonth());
   const [pendingSelections, setPendingSelections] = useState<DateSelection>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [hasChanges, setHasChanges] = useState(false);
@@ -193,7 +209,7 @@ export default function CalendarMatrix({
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Calendar className="h-4 w-4" />
-          <h3 className="font-medium">October 2024</h3>
+          <h3 className="font-medium">{format(selectedMonth, 'MMMM yyyy')}</h3>
         </div>
         <p className="text-xs text-muted-foreground">Select your available dates</p>
       </div>
@@ -240,17 +256,17 @@ export default function CalendarMatrix({
                       allAvailable && "bg-green-500 text-white font-semibold",
                       !allAvailable && availableUsers.length > 0 && "bg-amber-100 dark:bg-amber-900/20",
                       isPendingSelected && "ring-2 ring-primary ring-offset-1",
-                      hasPendingChange && "ring-2 ring-orange-400 ring-offset-1 bg-orange-50",
+                      hasPendingChange && "ring-2 ring-orange-300 ring-offset-1 bg-orange-50",
                       (isSubmitting || isLoading) && "opacity-50 cursor-not-allowed"
                     )}
                   >
                     <div className="font-medium">{format(date, 'd')}</div>
-                    {isPendingSelected && (
+                    {/* {isPendingSelected && (
                       <Check className="h-3 w-3 absolute top-0.5 right-0.5 text-primary" />
-                    )}
-                    {hasPendingChange && (
+                    )} */}
+                    {/* {hasPendingChange && (
                       <div className="w-2 h-2 bg-orange-400 rounded-full absolute top-0.5 left-0.5" />
-                    )}
+                    )} */}
                     {availableUsers.length > 0 && (
                       <div className="flex justify-center mt-0.5">
                         <div className="flex -space-x-1">
@@ -356,7 +372,7 @@ export default function CalendarMatrix({
         <div className="text-xs text-muted-foreground space-y-1">
           <p>• Click dates to select your availability</p>
           <p>• Green dates = everyone is available</p>
-          <p>• Orange dot = unsaved changes</p>
+          <p>• Orange = unsaved changes</p>
           <p>• Click "Save Availability" to confirm your selection</p>
         </div>
       </div>

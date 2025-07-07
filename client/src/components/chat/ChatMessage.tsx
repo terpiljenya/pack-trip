@@ -1,6 +1,7 @@
-import { Bot, User, MapPin } from "lucide-react";
+import { Bot, User, MapPinPlus } from "lucide-react";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
+import ReactMarkdown from "react-markdown";
 import CalendarMatrix from "./CalendarMatrix";
 import ConflictBanner from "./ConflictBanner";
 import ItineraryCard from "./ItineraryCard";
@@ -76,15 +77,9 @@ export default function ChatMessage({
       <div className="flex justify-center">
         <div className="bg-white rounded-2xl p-4 shadow-sm max-w-md text-center">
           <div className="w-12 h-12 bg-primary rounded-full flex items-center justify-center mx-auto mb-3">
-            <MapPin className="w-6 h-6 text-white" />
+            <MapPinPlus className="w-6 h-6 text-white" />
           </div>
           <p className="text-sm text-slate-600 mb-4">{message.content}</p>
-          <div className="text-xs text-slate-500">
-            <span className="inline-flex items-center">
-              <User className="w-3 h-3 mr-1" />
-              Trip ID: BCN-2024-001
-            </span>
-          </div>
         </div>
       </div>
     );
@@ -107,7 +102,9 @@ export default function ChatMessage({
             </span>
           </div>
           <div className="mb-4">
-            <p className="text-slate-800 mb-4">{message.content}</p>
+            <div className="prose prose-sm max-w-none prose-slate text-slate-800 mb-4">
+              <ReactMarkdown>{message.content}</ReactMarkdown>
+            </div>
             <DetailedPlanCard planData={message.metadata} />
           </div>
         </div>
@@ -117,11 +114,7 @@ export default function ChatMessage({
 
   if (isAgent) {
     // Only show calendar when explicitly mentioning "mark their availability on the calendar below"
-    const showCalendar =
-      message.content.includes(
-        "mark their availability on the calendar below",
-      ) ||
-      message.content.includes("mark your availability on the calendar below");
+    const showCalendar =message.metadata && message.metadata.type === "calendar_suggestion";
     const showOptions = message.metadata && message.metadata.type === "trip_options";
     const showConflict = message.content.includes("conflict");
 
@@ -143,7 +136,9 @@ export default function ChatMessage({
             </span>
           </div>
           <div className="bg-slate-100 rounded-2xl p-4 shadow-sm">
-            <p className="text-slate-800 mb-3">{message.content}</p>
+            <div className="prose prose-sm max-w-none prose-slate text-slate-800 mb-3">
+              <ReactMarkdown>{message.content}</ReactMarkdown>
+            </div>
 
             {showCalendar && (
               <CalendarMatrix
@@ -152,6 +147,8 @@ export default function ChatMessage({
                 onSetAvailability={onSetAvailability}
                 onSetBatchAvailability={onSetBatchAvailability}
                 userId={userId}
+                extractedMonth={message.metadata?.calendar_month}
+                extractedYear={message.metadata?.calendar_year}
               />
             )}
 

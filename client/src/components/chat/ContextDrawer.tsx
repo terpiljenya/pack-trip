@@ -93,9 +93,6 @@ export default function ContextDrawer({
       <div className="border-b border-slate-200 p-4">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-lg font-semibold text-slate-900">Trip Details</h2>
-          <Badge variant="outline" className="text-xs">
-            {tripContext.state.replace('_', ' ')}
-          </Badge>
         </div>
         
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
@@ -169,23 +166,6 @@ export default function ContextDrawer({
           <TabsContent value="calendar" className="space-y-4 mt-0">
             {/* Selected Dates */}
             <Card>
-              <CardContent className="p-4">
-                <h3 className="font-semibold text-slate-900 mb-3">Selected Dates</h3>
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm text-slate-600">Departure</span>
-                    <span className="text-sm font-medium text-slate-900">Oct 20, 2024</span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm text-slate-600">Return</span>
-                    <span className="text-sm font-medium text-slate-900">Oct 26, 2024</span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm text-slate-600">Duration</span>
-                    <span className="text-sm font-medium text-slate-900">6 days</span>
-                  </div>
-                </div>
-              </CardContent>
             </Card>
 
             {/* Travelers */}
@@ -297,13 +277,13 @@ export default function ContextDrawer({
 
       {/* Actions */}
       <div className="border-t border-slate-200 p-4 space-y-2">
-        <Button className="w-full bg-primary hover:bg-primary/80 text-white">
+        {/* <Button className="w-full bg-primary hover:bg-primary/80 text-white">
           <CalendarPlus className="w-4 h-4 mr-2" />
           Add to Calendar
-        </Button>
+        </Button> */}
         <Button 
           variant="outline" 
-          className="w-full"
+          className="w-full bg-primary text-white hover:bg-primary/80"
           onClick={() => {
             if (trip?.invite_token) {
               const inviteUrl = `${window.location.origin}/join/${trip.trip_id}?token=${trip.invite_token}`;

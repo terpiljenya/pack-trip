@@ -14,12 +14,14 @@ import {
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Badge } from "@/components/ui/badge";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import ChatMessage from "@/components/chat/ChatMessage";
 import MessageInput from "@/components/chat/MessageInput";
 import ContextDrawer from "@/components/chat/ContextDrawer";
 import PreferencesDialog from "@/components/chat/PreferencesDialog";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
+import { Trip } from "../../../shared/schema";
 
 export default function ChatPage() {
   const params = useParams();
@@ -64,6 +66,8 @@ export default function ChatPage() {
     missingPreferences,
     isConnected,
   } = useTripState(tripId, userId);
+  
+  const tripData = trip as Trip;
 
   // Auto-scroll to bottom when new messages arrive
   useEffect(() => {
@@ -139,12 +143,12 @@ export default function ChatPage() {
             <div className="w-10 h-10 bg-primary rounded-full flex items-center justify-center">
               <Plane className="w-5 h-5 text-white" />
             </div>
-            <div>
-              <h1 className="text-lg font-semibold text-slate-900">
-                PackTrip AI
-              </h1>
-              <p className="text-xs text-slate-500">Barcelona Trip Planning</p>
-            </div>
+                          <div>
+                <h1 className="text-lg font-semibold text-slate-900">
+                  {tripData?.title || "PackTrip AI"}
+                </h1>
+                <p className="text-xs text-slate-500">{tripData?.destination || "Trip Planning"}</p>
+              </div>
           </div>
           <Sheet open={isDrawerOpen} onOpenChange={setIsDrawerOpen}>
             <SheetTrigger asChild>
@@ -155,7 +159,7 @@ export default function ChatPage() {
             <SheetContent side="right" className="w-full max-w-md p-0">
               <ContextDrawer
                 tripContext={tripContext}
-                trip={trip}
+                trip={tripData}
                 onVote={vote}
                 onSetAvailability={setAvailability}
                 onSetBatchAvailability={setBatchAvailability}
@@ -177,10 +181,10 @@ export default function ChatPage() {
               </div>
               <div>
                 <h1 className="text-xl font-semibold text-slate-900">
-                  PackTrip AI
+                  {tripData?.title || "PackTrip AI"}
                 </h1>
                 <p className="text-sm text-slate-500">
-                  Barcelona Trip Planning • {tripContext.participants.length}{" "}
+                  {tripData?.destination || "Trip Planning"} • {tripContext.participants.length}{" "}
                   travelers
                 </p>
               </div>
@@ -218,11 +222,15 @@ export default function ChatPage() {
               </Badge>
               <div className="flex -space-x-2">
                 {onlineParticipants.map((participant) => (
-                  <div
-                    key={participant.id}
-                    className="w-8 h-8 rounded-full border-2 border-white relative"
-                    style={{ backgroundColor: participant.color }}
-                  >
+                  <div key={participant.id} className="relative">
+                    <Avatar className="w-8 h-8 border-2 border-white">
+                      <AvatarFallback
+                        className="text-white font-medium text-sm"
+                        style={{ backgroundColor: participant.color }}
+                      >
+                        {participant.displayName?.[0] || "U"}
+                      </AvatarFallback>
+                    </Avatar>
                     <div className="absolute -top-1 -right-1 w-3 h-3 bg-green-500 rounded-full border-2 border-white"></div>
                   </div>
                 ))}
@@ -276,7 +284,7 @@ export default function ChatPage() {
         <div className="lg:w-3/10 bg-white border-l border-slate-200">
           <ContextDrawer
             tripContext={tripContext}
-            trip={trip}
+            trip={tripData}
             onVote={vote}
             onSetAvailability={setAvailability}
             onSetBatchAvailability={setBatchAvailability}
