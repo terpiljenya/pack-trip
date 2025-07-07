@@ -444,12 +444,37 @@ async def create_message(trip_id: str,
                     trip_id=trip_id,
                     user_id=None,  # Agent message
                     type="agent",
-                    content=
-                    f"✨ I've noted your preferences: {', '.join(analysis['extracted_preferences'].keys())}. These will help me suggest better options for your trip!",
-                    meta_data={
-                        "type": "preferences_extracted",
-                        "preferences": analysis["extracted_preferences"]
+                    content=f"✨ I've noted your preferences: {', '.join(analysis['extracted_preferences'].keys())}. These will help me suggest better options for your trip!",
+                    meta_data={"type": "preferences_extracted", "preferences": analysis["extracted_preferences"]}
+                )
+                db.add(preferences_message)
+                db.commit()
+                db.refresh(preferences_message)
+                
+                # Broadcast preferences notification
+                await manager.broadcast_to_trip(
+                    trip_id, {
+                        "type": "new_message",
+                        "message": {
+                            "id": preferences_message.id,
+                            "trip_id": preferences_message.trip_id,
+                            "user_id": preferences_message.user_id,
+                            "type": preferences_message.type,
+                            "content": preferences_message.content,
+                            "timestamp": preferences_message.timestamp.isoformat(),
+                            "metadata": preferences_message.meta_data
+                        },
+                        "timestamp": datetime.utcnow().isoformat()
                     })
+            elif analysis.get("has_preferences"):
+                # Even if we couldn't extract structured preferences, acknowledge the preferences
+                preferences_message = Message(
+                    trip_id=trip_id,
+                    user_id=None,  # Agent message
+                    type="agent",
+                    content="✨ I've noted your travel preferences! I'll keep them in mind when planning your trip options.",
+                    meta_data={"type": "raw_preferences_noted"}
+                )
                 db.add(preferences_message)
                 db.commit()
                 db.refresh(preferences_message)
@@ -675,58 +700,140 @@ async def generate_trip_options_internal(trip_id: str, consensus_dates: list,
         if existing_message:
             return
 
-        # Create trip options data
-        options = [{
-            "option_id": "cultural",
-            "type": "itinerary",
-            "title": "Cultural Explorer",
-            "description":
-            "Immerse yourself in art, history, and local traditions with visits to world-class museums, historic neighborhoods, and cultural landmarks.",
-            "price": 1200,
-            "image":
-            "https://images.unsplash.com/photo-1539037116277-4db20889f2d4?w=400&h=300&fit=crop",
-            "meta_data": {
-                "duration": "3 days",
-                "highlights": ["Museums", "Historic Sites", "Local Culture"],
-                "activity_level": "Moderate",
-                "consensus_dates": consensus_dates
-            }
-        }, {
-            "option_id": "beach_nightlife",
-            "type": "itinerary",
-            "title": "Beach & Nightlife",
-            "description":
-            "Perfect blend of relaxation and excitement with beach days, waterfront dining, and vibrant nightlife experiences.",
-            "price": 1400,
-            "image":
-            "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400&h=300&fit=crop",
-            "meta_data": {
-                "duration": "3 days",
-                "highlights": ["Beach Time", "Nightlife", "Coastal Dining"],
-                "activity_level": "High",
-                "consensus_dates": consensus_dates
-            }
-        }, {
-            "option_id": "balanced",
-            "type": "itinerary",
-            "title": "Balanced Experience",
-            "description":
-            "The best of both worlds combining cultural discoveries with leisure time, perfect for groups with diverse interests.",
-            "price": 1300,
-            "image":
-            "https://images.unsplash.com/photo-1508672019048-805c876b67e2?w=400&h=300&fit=crop",
-            "meta_data": {
-                "duration": "3 days",
-                "highlights": ["Culture", "Food", "Relaxation"],
-                "activity_level": "Moderate",
-                "consensus_dates": consensus_dates
-            }
-        }]
+        # Get user preferences for context including raw preferences
+        preferences = db.query(UserPreferences).filter(
+            UserPreferences.trip_id == trip_id).all()
 
-        # Create agent message with options in metadata
-        consensus_message = f"🎉 **Consensus Reached!**\n\nGreat news! Everyone is available on {len(consensus_dates)} dates. I've found the perfect overlap in your schedules and generated 3 fantastic itinerary options for your Barcelona trip.\n\n📅 **Available dates for everyone:**\n" + "\n".join(
-            f"• {date}" for date in
-            consensus_dates[:3]) + "\n\nVote for your favorite option below!"
+
+        # Get user information for preference grouping
+        users = db.query(User).filter(
+            User.id.in_([pref.user_id for pref in preferences])
+        ).all()
+        user_dict = {user.id: user for user in users}
+
+        # Group preferences by user for better conflict resolution
+        grouped_preferences = []
+        for pref in preferences:
+            user = user_dict.get(pref.user_id)
+            user_prefs = {
+                "user_id": pref.user_id,
+                "user_name": user.display_name if user else f"User {pref.user_id}",
+                "raw_preferences": pref.raw_preferences or [] # list of str with preferences about trip duration, attractions, etc
+            }
+            grouped_preferences.append(user_prefs)
+
+        # Build context for AI including grouped preferences and conflict analysis
+        context = {
+            "destination": trip.destination or "Barcelona",
+            "budget": trip.budget,
+            "consensus_dates": consensus_dates, # list of dates in YYYY-MM-DD format
+            "grouped_preferences": grouped_preferences,
+        }
+
+        # Generate personalized trip options using AI
+        response = openai_client.chat.completions.create(
+                model="gpt-4o",
+                messages=[{
+                                    "role": "system",
+                "content": """You are PackTrip AI, a travel planning expert specializing in group dynamics and conflict resolution. Generate 3 distinct trip itinerary options that address group preferences, resolve conflicts, and find common ground.
+
+Your strategy:
+1. ANALYZE CONFLICTS: Identify where group members have different preferences
+2. FIND COMMON GROUND: Look for shared interests and compromise opportunities  
+3. CREATE BALANCED OPTIONS: Design options that satisfy different user segments
+4. ADDRESS SPECIFIC DESIRES: Incorporate raw preferences from individual users
+5. OPTIMIZE DATES: Create options of different durations that fit within consensus dates
+
+When there are conflicts:
+- Create options that blend different travel styles
+- Suggest activities that appeal to multiple preference types
+- Use timing/location to satisfy different interests (morning culture, evening nightlife)
+- Highlight how each option addresses specific user needs
+- Offer different trip durations based on preferences and available dates
+
+Format as JSON:
+{
+    "options": [
+        {
+            "option_id": "unique_id",
+            "type": "itinerary", 
+            "title": "Engaging Title",
+            "description": "Compelling 2-sentence description highlighting key experiences and how it addresses group dynamics",
+            "price": estimated_price_per_person,
+            "image": "https://images.unsplash.com/photo-relevant-image?w=400&h=300&fit=crop",
+            "meta_data": {
+                "duration": "X days", 
+                "start_date": "YYYY-MM-DD",
+                "end_date": "YYYY-MM-DD",
+                "highlights": ["Key Highlight 1", "Key Highlight 2", "Key Highlight 3"],
+                "activity_level": "Low/Moderate/High",
+                "best_for": "Which users/preferences this appeals to",
+                "conflict_resolution": "How this option resolves group conflicts",
+                "user_satisfaction": {"user_name": "which aspects satisfy this user"},
+                "raw_preference_matches": ["specific raw preferences this addresses"],
+                "duration_rationale": "Why this duration was chosen based on preferences"
+            }
+        }
+    ]
+}
+
+Make options strategic - each should target different conflict resolution approaches while ensuring everyone gets something they want. Consider:
+- Different trip durations within consensus dates
+- Preferences about trip length from raw preferences
+- How to best utilize available dates
+- Balance between duration and activities"""
+                }, {
+                    "role": "user",
+                                         "content": f"""Generate 3 trip options for {context['destination']} with a focus on group dynamics and conflict resolution:
+
+TRIP DETAILS:
+- Destination: {context['destination']}
+- Budget: ${context['budget']} total (${context['budget'] // len(context['grouped_preferences']) if context['budget'] and len(context['grouped_preferences']) > 0 else 'flexible'} per person)
+- Available dates: {context['consensus_dates']}
+- Group size: {len(context['grouped_preferences'])} people
+
+INDIVIDUAL USER PREFERENCES (grouped by person):
+{context['grouped_preferences']}
+
+
+STRATEGY: Create 3 options that each take a different approach to resolving conflicts:
+1. Option 1: Focus on COMMON GROUND - emphasize shared interests and optimal duration
+2. Option 2: BALANCED COMPROMISE - blend different styles/activities with flexible timing
+3. Option 3: SEGMENTED SATISFACTION - different parts of trip satisfy different users and duration preferences
+
+Each option should explain HOW it addresses the group's specific conflicts and ensures everyone gets something they want."""
+                }],
+                response_format={"type": "json_object"},
+                max_tokens=2000,
+                temperature=0.7
+            )
+            
+        ai_response = json.loads(response.choices[0].message.content or "{}")
+        options = ai_response.get("options", [])
+        
+        # Add consensus_dates to each option's meta_data
+        for option in options:
+            if "meta_data" not in option:
+                option["meta_data"] = {}
+            option["meta_data"]["consensus_dates"] = consensus_dates
+                
+
+        # # Create personalized consensus message
+        # preference_summary = []
+        # if context["all_raw_preferences"]:
+        #     preference_summary = context["all_raw_preferences"][:3]  # Show top 3 raw preferences
+        
+        consensus_message = f"🎉 **Consensus Reached!**\n\nGreat news! Everyone is available on {len(consensus_dates)} dates. Based on your group's preferences"
+        
+        # if preference_summary:
+        #     consensus_message += f" (including \"{preference_summary[0]}\"" 
+        #     if len(preference_summary) > 1:
+        #         consensus_message += f" and \"{preference_summary[1]}\""
+        #     consensus_message += ")"
+        
+        consensus_message += f", I've generated 3 personalized itinerary options for your {context['destination']} trip."
+        
+        consensus_message += "\n\n✨ **Each option addresses your specific interests and preferences!**\n\nVote for your favorite option below!"
 
         db_message = Message(trip_id=trip_id,
                              user_id=None,
@@ -789,7 +896,7 @@ async def generate_detailed_trip_plan(trip_id: str, winning_option: dict,
         preferences = db.query(UserPreferences).filter(
             UserPreferences.trip_id == trip_id).all()
 
-        # Build context for AI
+        # Build context for AI including raw preferences
         context = {
             "destination":
             trip.destination or "Barcelona",
@@ -804,8 +911,10 @@ async def generate_detailed_trip_plan(trip_id: str, winning_option: dict,
                 "accommodation_type": pref.accommodation_type,
                 "travel_style": pref.travel_style,
                 "activities": pref.activities,
-                "dietary_restrictions": pref.dietary_restrictions
-            } for pref in preferences]
+                "dietary_restrictions": pref.dietary_restrictions,
+                "raw_preferences": pref.raw_preferences or []
+            } for pref in preferences],
+            "all_raw_preferences": [msg for pref in preferences if pref.raw_preferences for msg in pref.raw_preferences]
         }
 
         # the newest OpenAI model is "gpt-4o" which was released May 13, 2024. do not change this unless explicitly requested by the user
@@ -853,8 +962,10 @@ async def generate_detailed_trip_plan(trip_id: str, winning_option: dict,
                         - Theme: {context['title']}
                         - Description: {context['description']}
                         - Budget: {context.get('budget', 'Moderate')}
-                        - Preferences: {context['preferences']}
+                        - Structured Preferences: {context['preferences']}
+                        - Raw User Preferences: {context['all_raw_preferences']}
                         
+                        Pay special attention to the raw preferences as they contain specific desires and context like "bar crawl in Porto" or other unique requests.
                         Focus on specific, bookable venues and activities with real addresses and timing."""
                 }],
                 response_format={"type": "json_object"},
@@ -1408,7 +1519,8 @@ async def reset_carol(request: dict, db: Session = Depends(get_db)):
         travel_style="cultural",
         activities=["sightseeing", "museums", "food tours", "shopping"],
         dietary_restrictions="Vegetarian",
-        special_requirements="Quiet rooms preferred")
+        special_requirements="Quiet rooms preferred",
+        raw_preferences=["I love exploring museums and cultural sites", "I'm vegetarian and prefer quiet accommodations", "Shopping and food tours sound amazing"])
 
     bob_prefs = UserPreferences(
         user_id=2,
@@ -1418,7 +1530,8 @@ async def reset_carol(request: dict, db: Session = Depends(get_db)):
         travel_style="adventure",
         activities=["beach", "outdoor activities", "nightlife", "food tours"],
         dietary_restrictions=None,
-        special_requirements="Close to nightlife areas")
+        special_requirements="Close to nightlife areas",
+        raw_preferences=["I'm all about adventure and outdoor activities", "Beach time would be great", "Let's hit the nightlife scene", "Close to bars and clubs please"])
 
     db.add(alice_prefs)
     db.add(bob_prefs)
@@ -1560,7 +1673,8 @@ async def startup_event():
             travel_style="cultural",
             activities=["sightseeing", "museums", "food tours", "shopping"],
             dietary_restrictions="Vegetarian",
-            special_requirements="Quiet rooms preferred"),
+            special_requirements="Quiet rooms preferred",
+            raw_preferences=["I love exploring museums and cultural sites", "I'm vegetarian and prefer quiet accommodations", "Shopping and food tours sound amazing"]),
         UserPreferences(user_id=2,
                         trip_id="BCN-2024-001",
                         budget_preference="medium",
@@ -1568,7 +1682,8 @@ async def startup_event():
                         travel_style="adventure",
                         activities=["beach", "outdoors", "nightlife", "food"],
                         dietary_restrictions=None,
-                        special_requirements="Close to nightlife areas")
+                        special_requirements="Close to nightlife areas",
+                        raw_preferences=["I'm all about adventure and outdoor activities", "Beach time would be great", "Let's hit the nightlife scene", "Close to bars and clubs please"])
     ]
 
     for pref in preferences:

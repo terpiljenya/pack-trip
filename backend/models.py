@@ -87,6 +87,7 @@ class UserPreferences(Base):
     activities = Column(JSON, nullable=True)  # array of activities
     dietary_restrictions = Column(String, nullable=True)
     special_requirements = Column(Text, nullable=True)
+    raw_preferences = Column(JSON, nullable=True)  # array of raw preference messages
     created_at = Column(DateTime, default=datetime.utcnow)
     
     # Relationships

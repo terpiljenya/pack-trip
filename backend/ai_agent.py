@@ -39,7 +39,8 @@ class AIAgent:
             "extracted_preferences": Optional[Dict],
             "response_needed": bool,
             "calendar_month": Optional[int],
-            "calendar_year": Optional[int]
+            "calendar_year": Optional[int],
+            "has_preferences": bool
         }
         """
         
@@ -52,7 +53,8 @@ class AIAgent:
             "extracted_preferences": None,
             "response_needed": False,
             "calendar_month": intent_analysis.extracted_month,
-            "calendar_year": intent_analysis.extracted_year
+            "calendar_year": intent_analysis.extracted_year,
+            "has_preferences": False
         }
         
         # Handle calendar intent
@@ -62,12 +64,19 @@ class AIAgent:
             
         # Extract preferences regardless of intent
         preferences = await self._extract_preferences(message)
+        has_any_preferences = await self._has_preferences_content(message)
+        
         if preferences:
             # Convert Pydantic model to dict, excluding None values
             preferences_dict = {k: v for k, v in preferences.model_dump().items() if v is not None}
             if preferences_dict:  # Only proceed if there are actual preferences
                 result["extracted_preferences"] = preferences_dict
-                await self._update_user_preferences(user_id, trip_id, preferences_dict, db)
+                result["has_preferences"] = True
+                await self._update_user_preferences(user_id, trip_id, preferences_dict, message, db)
+        elif has_any_preferences:
+            # Even if we couldn't parse structured preferences, save the raw message
+            result["has_preferences"] = True
+            await self._update_user_preferences(user_id, trip_id, {}, message, db)
         
         return result
     
@@ -229,7 +238,7 @@ Examples:
             print(f"Error extracting preferences: {e}")
             return None
     
-    async def _update_user_preferences(self, user_id: int, trip_id: str, preferences: Dict[str, Any], db: Session):
+    async def _update_user_preferences(self, user_id: int, trip_id: str, preferences: Dict[str, Any], message: str, db: Session):
         """Update user preferences in the database"""
         
         try:
@@ -245,6 +254,11 @@ Examples:
                     if hasattr(existing_preferences, key):
                         setattr(existing_preferences, key, value)
                 
+                # Add raw message to existing raw_preferences
+                if existing_preferences.raw_preferences is None:
+                    existing_preferences.raw_preferences = []
+                existing_preferences.raw_preferences.append(message)
+                
                 db.commit()
                 print(f"Updated preferences for user {user_id}: {preferences}")
                 
@@ -253,6 +267,7 @@ Examples:
                 new_preferences = UserPreferences(
                     user_id=user_id,
                     trip_id=trip_id,
+                    raw_preferences=[message],
                     **preferences
                 )
                 db.add(new_preferences)
@@ -270,4 +285,62 @@ Examples:
                     
         except Exception as e:
             print(f"Error updating preferences: {e}")
-            db.rollback() 
+            db.rollback()
+
+    async def _has_preferences_content(self, message: str) -> bool:
+        """Check if a message contains any preference-related content"""
+        
+        try:
+            response = self.client.chat.completions.create(
+                model="gpt-4o-mini",
+                messages=[
+                    {
+                        "role": "system",
+                        "content": """You are an AI assistant that detects if a message contains any travel preferences or desires.
+
+Return "true" if the message contains ANY mention of:
+- Travel preferences (budget, accommodation, activities, food, etc.)
+- Specific desires or interests for the trip
+- Travel style preferences
+- Activity suggestions
+- Food/dining preferences
+- Accommodation preferences
+- Any specific requests for the trip
+
+Return "false" if the message is purely:
+- General conversation
+- Date/time coordination only
+- Greetings
+- Administrative messages
+
+Examples that should return "true":
+- "I love hiking and adventure sports"
+- "let's do a bar crawl in Porto"
+- "I prefer budget accommodations"
+- "I'm vegetarian"
+- "I want to visit museums"
+- "Beach time would be great"
+- "I love trying local food"
+
+Examples that should return "false":
+- "Hello everyone"
+- "How's everyone doing?"
+- "Let's go in September"
+- "What time works for you?"
+
+Return only "true" or "false"."""
+                    },
+                    {
+                        "role": "user",
+                        "content": f"Does this message contain travel preferences? Message: {message}"
+                    }
+                ],
+                temperature=0.1,
+                max_tokens=10
+            )
+            
+            return response.choices[0].message.content.strip().lower() == "true"
+            
+        except Exception as e:
+            print(f"Error detecting preference content: {e}")
+            return False 

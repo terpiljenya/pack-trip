@@ -26,6 +26,7 @@ class UserPreferencesBase(BaseModel):
     activities: Optional[List[str]] = None
     dietary_restrictions: Optional[str] = None
     special_requirements: Optional[str] = None
+    raw_preferences: Optional[List[str]] = None
 
 class UserPreferencesCreate(UserPreferencesBase):
     pass
