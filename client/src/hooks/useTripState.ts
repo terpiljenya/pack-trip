@@ -63,7 +63,7 @@ export function useTripState(tripId: string, userId: number) {
     enabled: !!tripId,
   });
 
-  // Send message mutation
+  // Send message mutation with optimistic update so user messages appear instantly
   const sendMessageMutation = useMutation({
     mutationFn: async (content: string) => {
       const response = await apiRequest(
@@ -77,7 +77,47 @@ export function useTripState(tripId: string, userId: number) {
       );
       return response.json();
     },
-    onSuccess: () => {
+    onMutate: async (content: string) => {
+      // Pause any outgoing refetches for messages so we can optimistically update
+      await queryClient.cancelQueries({
+        queryKey: [`/api/trips/${tripId}/messages`],
+      });
+
+      // Snapshot the previous messages list
+      const previousMessages = queryClient.getQueryData([
+        `/api/trips/${tripId}/messages`,
+      ]);
+
+      // Create an optimistic message payload matching the API shape
+      const optimisticMessage = {
+        id: Date.now(), // Temporary ID until server responds
+        trip_id: tripId,
+        user_id: userId,
+        type: "user" as const,
+        content,
+        timestamp: new Date().toISOString(),
+      };
+
+      // Push optimistic message into cache so it renders immediately
+      queryClient.setQueryData(
+        [`/api/trips/${tripId}/messages`],
+        (old: any) => [...(old || []), optimisticMessage],
+      );
+
+      // Return context for potential rollback
+      return { previousMessages };
+    },
+    onError: (_err, _content, context) => {
+      // Rollback to previous state if mutation fails
+      if (context?.previousMessages) {
+        queryClient.setQueryData(
+          [`/api/trips/${tripId}/messages`],
+          context.previousMessages,
+        );
+      }
+    },
+    onSettled: () => {
+      // Always refetch to sync with server & remove optimistic placeholder if necessary
       queryClient.invalidateQueries({
         queryKey: [`/api/trips/${tripId}/messages`],
       });

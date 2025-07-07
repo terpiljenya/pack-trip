@@ -66,46 +66,8 @@ export default function ItineraryCard({
   const [imageError, setImageError] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
   const [aiImage, setAiImage] = useState<string | null>(null);
-  const [isGeneratingImage, setIsGeneratingImage] = useState(false);
-  const [shouldGenerateImage, setShouldGenerateImage] = useState(false);
 
-  // Generate AI image when component mounts
-  useEffect(() => {
-    if (option.description && !option.image && !aiImage && !isGeneratingImage && !shouldGenerateImage) {
-      setShouldGenerateImage(true);
-    }
-  }, [option.description, option.image, aiImage, isGeneratingImage, shouldGenerateImage]);
-
-  useEffect(() => {
-    if (shouldGenerateImage) {
-      generateAIImage();
-    }
-  }, [shouldGenerateImage]);
-
-  const generateAIImage = async () => {
-    if (!option.description || option.image || aiImage || isGeneratingImage) return;
-    
-    setIsGeneratingImage(true);
-    try {
-      // Extract destination from title or use a default
-      const destination = option.title.includes('Barcelona') ? 'Barcelona' : 'Barcelona';
-      // const imageUrl = await generateItineraryImage(
-      //   option.title,
-      //   option.description,
-      //   destination
-      // );
-      
-      // if (imageUrl) {
-      //   setAiImage(imageUrl);
-      // }
-    } catch (error) {
-      console.error('Failed to generate AI image:', error);
-    } finally {
-      setIsGeneratingImage(false);
-      setShouldGenerateImage(false);
-    }
-  };
-  
+  // Generate AI image when component mounts  
   const votesByEmoji = votes.reduce((acc, vote) => {
     if (!acc[vote.emoji]) {
       acc[vote.emoji] = [];
@@ -279,32 +241,6 @@ export default function ItineraryCard({
               </div>
             )}
           </div>
-          
-          {/* AI Generated Image on the right side */}
-          <div className="flex-shrink-0 w-24 h-24">
-            {isGeneratingImage ? (
-              <div className="w-full h-full bg-slate-100 rounded-lg flex items-center justify-center">
-                <div className="animate-spin rounded-full h-8 w-8 border-2 border-slate-300 border-t-slate-600"></div>
-              </div>
-            ) : (aiImage || (option.image && !imageError)) ? (
-              <img 
-                src={aiImage || option.image!} 
-                alt={option.title}
-                className="w-full h-full object-cover rounded-lg"
-                onError={() => {
-                  if (aiImage) {
-                    setAiImage(null);
-                  } else {
-                    setImageError(true);
-                  }
-                }}
-              />
-            ) : (
-              <div className="w-full h-full bg-slate-100 rounded-lg flex items-center justify-center">
-                <ImageIcon className="w-6 h-6 text-slate-400" />
-              </div>
-            )}
-          </div>
         </div>
         
         {isExpanded && structuredPlan?.day_plans && (
@@ -336,7 +272,6 @@ export default function ItineraryCard({
                         </div>
                         {activity.cost && (
                           <Badge variant="outline" className="text-xs ml-2">
-                            <DollarSign className="w-3 h-3 mr-1" />
                             €{activity.cost}
                           </Badge>
                         )}
