@@ -161,6 +161,11 @@ The application uses a PostgreSQL database with the following main entities:
   - Removed duplicate frontend consensus checking logic and polling
   - Backend now handles consensus detection and trip option generation seamlessly
   - Improved architecture by centralizing consensus logic server-side
+- July 07, 2025. Fixed database and API issues:
+  - Added missing `raw_preferences` column to user_preferences table
+  - Fixed OpenAI API call errors in AI agent preferences extraction
+  - Fixed database constraint to allow users to have preferences for multiple trips
+  - AI agent now successfully extracts and stores user preferences from chat messages
 
 ## Next Steps Plan
 

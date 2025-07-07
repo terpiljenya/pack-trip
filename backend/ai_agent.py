@@ -192,7 +192,7 @@ Example responses:
         """Extract travel preferences from the message"""
         
         try:
-            response = self.client.responses.parse(
+            response = self.client.beta.chat.completions.parse(
                 model="gpt-4o",
                 messages=[
                     {
@@ -226,7 +226,7 @@ Examples:
                 max_tokens=300
             )
             
-            parsed_preferences = response.output_parsed
+            parsed_preferences = response.choices[0].message.parsed
             
             # Check if any preferences were actually extracted
             if all(value is None for value in parsed_preferences.model_dump().values()):
