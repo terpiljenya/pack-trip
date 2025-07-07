@@ -7,6 +7,7 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { TripContext, TripState } from '@/types/trip';
 import { useToast } from '@/hooks/use-toast';
+import MapView from './MapView';
 
 interface ContextDrawerProps {
   tripContext: TripContext;
@@ -90,6 +91,10 @@ export default function ContextDrawer({
 }: ContextDrawerProps) {
   const [activeTab, setActiveTab] = useState('roadmap');
   const { toast } = useToast();
+
+  // Extract the latest detailed plan from chat messages (if any)
+  const detailedPlanMessage = [...tripContext.messages].reverse().find((m: any) => m.type === 'detailed_plan');
+  const detailedPlan = detailedPlanMessage?.metadata;
 
   const onlineParticipants = tripContext.participants.filter(p => p.isOnline);
   const offlineParticipants = tripContext.participants.filter(p => !p.isOnline);
@@ -273,15 +278,23 @@ export default function ContextDrawer({
           </TabsContent>
 
           <TabsContent value="map" className="space-y-4 mt-0">
-            <Card>
-              <CardContent className="p-4">
-                <h3 className="font-semibold text-slate-900 mb-3">Map Preview</h3>
-                <div className="text-center py-8 text-slate-500">
-                  <MapPin className="w-12 h-12 mx-auto mb-2 opacity-50" />
-                  <p className="text-sm">Map will show destinations and activities</p>
-                </div>
-              </CardContent>
-            </Card>
+            {detailedPlan ? (
+              <Card>
+                <CardContent className="p-0">
+                  <MapView planData={detailedPlan} destination={trip?.destination} />
+                </CardContent>
+              </Card>
+            ) : (
+              <Card>
+                <CardContent className="p-4">
+                  <h3 className="font-semibold text-slate-900 mb-3">Map Preview</h3>
+                  <div className="text-center py-8 text-slate-500">
+                    <MapPin className="w-12 h-12 mx-auto mb-2 opacity-50" />
+                    <p className="text-sm">Map will show destinations and activities</p>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
           </TabsContent>
         </Tabs>
       </div>
