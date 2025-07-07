@@ -1351,15 +1351,15 @@ async def reset_carol(request: dict, db: Session = Depends(get_db)):
 
     # Add Alice and Bob's availability for October dates
     october_dates = [
-        datetime(2024, 10, 12),
-        datetime(2024, 10, 13),
-        datetime(2024, 10, 14),
-        datetime(2024, 10, 15),
-        datetime(2024, 10, 16),
-        datetime(2024, 10, 17),
-        datetime(2024, 10, 18),
-        datetime(2024, 10, 19),
-        datetime(2024, 10, 20)
+        datetime(2025, 10, 12),
+        datetime(2025, 10, 13),
+        datetime(2025, 10, 14),
+        datetime(2025, 10, 15),
+        datetime(2025, 10, 16),
+        datetime(2025, 10, 17),
+        datetime(2025, 10, 18),
+        datetime(2025, 10, 19),
+        datetime(2025, 10, 20)
     ]
 
     # Alice is available for all dates
@@ -1376,8 +1376,8 @@ async def reset_carol(request: dict, db: Session = Depends(get_db)):
                                      user_id=2,
                                      date=date,
                                      available=date not in [
-                                         datetime(2024, 10, 15),
-                                         datetime(2024, 10, 16)
+                                         datetime(2025, 10, 15),
+                                         datetime(2025, 10, 16)
                                      ])
         db.add(bob_avail)
 
