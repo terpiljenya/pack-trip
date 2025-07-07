@@ -1,10 +1,11 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { Calendar, Clock, MapPin, ChevronDown, ChevronUp, DollarSign } from 'lucide-react';
+import { Calendar, Clock, MapPin, ChevronDown, ChevronUp, DollarSign, Image as ImageIcon } from 'lucide-react';
 import QuickVoteChips from './QuickVoteChips';
+import { generateItineraryImage } from '@/lib/ai-image-generator';
 
 interface ItineraryCardProps {
   option: {
@@ -64,6 +65,46 @@ export default function ItineraryCard({
 }: ItineraryCardProps) {
   const [imageError, setImageError] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
+  const [aiImage, setAiImage] = useState<string | null>(null);
+  const [isGeneratingImage, setIsGeneratingImage] = useState(false);
+  const [shouldGenerateImage, setShouldGenerateImage] = useState(false);
+
+  // Generate AI image when component mounts
+  useEffect(() => {
+    if (option.description && !option.image && !aiImage && !isGeneratingImage && !shouldGenerateImage) {
+      setShouldGenerateImage(true);
+    }
+  }, [option.description, option.image, aiImage, isGeneratingImage, shouldGenerateImage]);
+
+  useEffect(() => {
+    if (shouldGenerateImage) {
+      generateAIImage();
+    }
+  }, [shouldGenerateImage]);
+
+  const generateAIImage = async () => {
+    if (!option.description || option.image || aiImage || isGeneratingImage) return;
+    
+    setIsGeneratingImage(true);
+    try {
+      // Extract destination from title or use a default
+      const destination = option.title.includes('Barcelona') ? 'Barcelona' : 'Barcelona';
+      const imageUrl = await generateItineraryImage(
+        option.title,
+        option.description,
+        destination
+      );
+      
+      if (imageUrl) {
+        setAiImage(imageUrl);
+      }
+    } catch (error) {
+      console.error('Failed to generate AI image:', error);
+    } finally {
+      setIsGeneratingImage(false);
+      setShouldGenerateImage(false);
+    }
+  };
   
   const votesByEmoji = votes.reduce((acc, vote) => {
     if (!acc[vote.emoji]) {
@@ -156,26 +197,6 @@ export default function ItineraryCard({
                 €{option.price.toLocaleString()}
               </span>
             )}
-            {structuredPlan && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setIsExpanded(!isExpanded)}
-                className="h-8 px-3"
-              >
-                {isExpanded ? (
-                  <>
-                    <ChevronUp className="w-4 h-4 mr-1" />
-                    Less
-                  </>
-                ) : (
-                  <>
-                    <ChevronDown className="w-4 h-4 mr-1" />
-                    Details
-                  </>
-                )}
-              </Button>
-            )}
           </div>
         </div>
         
@@ -197,79 +218,144 @@ export default function ItineraryCard({
       </CardHeader>
       
       <CardContent className="pt-0">
-        {option.description && (
-          <p className="text-sm text-slate-600 mb-3">{option.description}</p>
-        )}
-        
-        {!isExpanded ? (
-          /* Collapsed view - show highlights */
-          activityHighlights.length > 0 && (
-            <div className="mb-4">
-              <h4 className="text-sm font-medium text-slate-700 mb-2">Highlights:</h4>
-              <div className="space-y-1">
-                {activityHighlights.slice(0, 3).map((highlight, index) => (
-                  <div key={index} className="flex items-center gap-2 text-sm text-slate-600">
-                    <MapPin className="w-3 h-3 text-slate-400" />
-                    <span>{highlight}</span>
+        {/* Main content with AI image on the right */}
+        <div className="flex gap-4 mb-4">
+          <div className="flex-1">
+            {option.description && (
+              <p className="text-sm text-slate-600 mb-3">{option.description}</p>
+            )}
+            
+            {!isExpanded ? (
+              /* Collapsed view - show highlights */
+              activityHighlights.length > 0 && (
+                <div className="mb-4">
+                  <div className="flex items-center justify-between mb-2">
+                    <h4 className="text-sm font-medium text-slate-700">Highlights:</h4>
+                    {structuredPlan && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setIsExpanded(!isExpanded)}
+                        className="h-6 px-2 text-xs"
+                      >
+                        {isExpanded ? (
+                          <>
+                            <ChevronUp className="w-3 h-3 mr-1" />
+                            Less
+                          </>
+                        ) : (
+                          <>
+                            <ChevronDown className="w-3 h-3 mr-1" />
+                            Details
+                          </>
+                        )}
+                      </Button>
+                    )}
                   </div>
-                ))}
-                {activityHighlights.length > 3 && (
-                  <div className="text-xs text-slate-500 ml-5">
-                    +{activityHighlights.length - 3} more activities
-                  </div>
-                )}
-              </div>
-            </div>
-          )
-        ) : (
-          /* Expanded view - show detailed day plans */
-          structuredPlan?.day_plans && (
-            <div className="mb-4 space-y-3">
-              <h4 className="text-sm font-medium text-slate-700">Daily Itinerary:</h4>
-              {structuredPlan.day_plans.map((day, dayIndex) => (
-                <div key={dayIndex} className="border border-slate-200 rounded-lg p-3 bg-slate-50">
-                  <div className="flex items-center gap-2 mb-2">
-                    <Badge variant="outline" className="bg-emerald-100 text-emerald-700 text-xs">
-                      Day {dayIndex + 1}
-                    </Badge>
-                  </div>
-                  <div className="space-y-2">
-                    {day.activities.slice(0, 2).map((activity, actIndex) => (
-                      <div key={actIndex} className="text-sm">
-                        <div className="flex items-start justify-between">
-                          <div className="flex-1">
-                            <div className="font-medium text-slate-800">{activity.name}</div>
-                            <div className="flex items-center gap-1 text-slate-500 text-xs mt-1">
-                              <MapPin className="w-3 h-3" />
-                              <span>{activity.location}</span>
-                              {activity.preliminary_length && (
-                                <>
-                                  <span className="mx-1">•</span>
-                                  <Clock className="w-3 h-3" />
-                                  <span>{activity.preliminary_length}</span>
-                                </>
-                              )}
-                            </div>
-                          </div>
-                          {activity.cost && (
-                            <Badge variant="outline" className="text-xs ml-2">
-                              <DollarSign className="w-3 h-3 mr-1" />
-                              €{activity.cost}
-                            </Badge>
-                          )}
-                        </div>
+                  <div className="space-y-1">
+                    {activityHighlights.slice(0, 3).map((highlight, index) => (
+                      <div key={index} className="flex items-center gap-2 text-sm text-slate-600">
+                        <MapPin className="w-3 h-3 text-slate-400" />
+                        <span>{highlight}</span>
                       </div>
                     ))}
-                    {day.activities.length > 2 && (
-                      <div className="text-xs text-slate-500">
-                        +{day.activities.length - 2} more activities this day
+                    {activityHighlights.length > 3 && (
+                      <div className="text-xs text-slate-500 ml-5">
+                        +{activityHighlights.length - 3} more activities
                       </div>
                     )}
                   </div>
                 </div>
-              ))}
-            </div>
-          )
+              )
+            ) : (
+              /* Expanded view - show detailed day plans */
+              <div className="flex items-center justify-between mb-2">
+                <h4 className="text-sm font-medium text-slate-700">Daily Itinerary:</h4>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setIsExpanded(!isExpanded)}
+                  className="h-6 px-2 text-xs"
+                >
+                  <ChevronUp className="w-3 h-3 mr-1" />
+                  Less
+                </Button>
+              </div>
+            )}
+          </div>
+          
+          {/* AI Generated Image on the right side */}
+          <div className="flex-shrink-0 w-24 h-24">
+            {isGeneratingImage ? (
+              <div className="w-full h-full bg-slate-100 rounded-lg flex items-center justify-center">
+                <div className="animate-spin rounded-full h-8 w-8 border-2 border-slate-300 border-t-slate-600"></div>
+              </div>
+            ) : (aiImage || (option.image && !imageError)) ? (
+              <img 
+                src={aiImage || option.image!} 
+                alt={option.title}
+                className="w-full h-full object-cover rounded-lg"
+                onError={() => {
+                  if (aiImage) {
+                    setAiImage(null);
+                  } else {
+                    setImageError(true);
+                  }
+                }}
+              />
+            ) : (
+              <div className="w-full h-full bg-slate-100 rounded-lg flex items-center justify-center">
+                <ImageIcon className="w-6 h-6 text-slate-400" />
+              </div>
+            )}
+          </div>
+        </div>
+        
+        {isExpanded && structuredPlan?.day_plans && (
+          <div className="mb-4 space-y-3">
+            {structuredPlan.day_plans.map((day, dayIndex) => (
+              <div key={dayIndex} className="border border-slate-200 rounded-lg p-3 bg-slate-50">
+                <div className="flex items-center gap-2 mb-2">
+                  <Badge variant="outline" className="bg-emerald-100 text-emerald-700 text-xs">
+                    Day {dayIndex + 1}
+                  </Badge>
+                </div>
+                <div className="space-y-2">
+                  {day.activities.slice(0, 2).map((activity, actIndex) => (
+                    <div key={actIndex} className="text-sm">
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1">
+                          <div className="font-medium text-slate-800">{activity.name}</div>
+                          <div className="flex items-center gap-1 text-slate-500 text-xs mt-1">
+                            <MapPin className="w-3 h-3" />
+                            <span>{activity.location}</span>
+                            {activity.preliminary_length && (
+                              <>
+                                <span className="mx-1">•</span>
+                                <Clock className="w-3 h-3" />
+                                <span>{activity.preliminary_length}</span>
+                              </>
+                            )}
+                          </div>
+                        </div>
+                        {activity.cost && (
+                          <Badge variant="outline" className="text-xs ml-2">
+                            <DollarSign className="w-3 h-3 mr-1" />
+                            €{activity.cost}
+                          </Badge>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                  {day.activities.length > 2 && (
+                    <div className="text-xs text-slate-500">
+                      +{day.activities.length - 2} more activities this day
+                    </div>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
         )}
         
         <div className="flex items-center justify-between">
