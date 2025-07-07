@@ -1401,7 +1401,6 @@ async def reset_carol(request: dict, db: Session = Depends(get_db)):
 
     db.commit()
 
-    db.commit()
 
     # Broadcast update to all connected clients
     await manager.broadcast_to_trip(trip_id, {
