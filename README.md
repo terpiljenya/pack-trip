@@ -1,4 +1,4 @@
-# PackTrip AI
+# TripSync AI
 
 ## Installing Python dependencies
 

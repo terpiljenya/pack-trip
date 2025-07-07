@@ -175,7 +175,7 @@ export default function ChatPage() {
             </div>
             <div>
               <h1 className="text-lg font-semibold text-slate-900">
-                {tripData?.title || "PackTrip AI"}
+                {tripData?.title || "TripSync AI"}
               </h1>
               <p className="text-xs text-slate-500">{tripData?.destination || "Trip Planning"}</p>
             </div>
@@ -201,7 +201,7 @@ export default function ChatPage() {
       )}
 
       {/* Main Chat Area */}
-      <div className="flex-1 flex flex-col lg:w-7/10">
+      <div className="flex-1 flex flex-col lg:w-2/3">
         {/* Desktop Header */}
         {!isMobile && (
           <div className="bg-white border-b border-slate-200 px-6 py-4 flex items-center justify-between">
@@ -212,15 +212,14 @@ export default function ChatPage() {
                 onClick={() => setLocation("/")}
                 className="mr-2"
               >
-                <Home className="w-4 h-4 mr-2" />
-                Back to Home
+                <ArrowLeft className="w-4 h-4 mr-2" />
               </Button>
               <div className="w-12 h-12 bg-primary rounded-2xl flex items-center justify-center">
                 <Plane className="w-6 h-6 text-white" />
               </div>
               <div>
                 <h1 className="text-xl font-semibold text-slate-900">
-                  {tripData?.title || "PackTrip AI"}
+                  {tripData?.title || "TripSync AI"}
                 </h1>
                 <p className="text-sm text-slate-500">
                   {tripData?.destination || "Trip Planning"} • {tripContext.participants.length}{" "}
@@ -320,7 +319,7 @@ export default function ChatPage() {
 
       {/* Desktop Context Drawer */}
       {!isMobile && (
-        <div className="lg:w-3/10 bg-white border-l border-slate-200">
+        <div className="lg:w-1/3 bg-white border-l border-slate-200 min-w-[380px]">
           <ContextDrawer
             tripContext={tripContext}
             trip={tripData}

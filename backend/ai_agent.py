@@ -162,7 +162,7 @@ Examples:
                 messages=[
                     {
                         "role": "system",
-                        "content": f"""You are PackTrip AI, a helpful travel planning assistant. The user mentioned dates in their message.
+                        "content": f"""You are TripSync AI, a helpful travel planning assistant. The user mentioned dates in their message.
 
 Trip context:
 - Destination: {trip_info['destination']}

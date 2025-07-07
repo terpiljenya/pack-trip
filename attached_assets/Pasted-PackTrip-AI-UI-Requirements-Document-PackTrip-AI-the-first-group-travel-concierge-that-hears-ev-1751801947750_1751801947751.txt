@@ -1,9 +1,9 @@
-PackTrip AI – UI Requirements Document
+TripSync AI – UI Requirements Document
 
-PackTrip AI – the first group‑travel concierge that hears everyone, negotiates the perfect plan, and books it, all from a single chat
+TripSync AI – the first group‑travel concierge that hears everyone, negotiates the perfect plan, and books it, all from a single chat
 
 1 Purpose & Scope
-Define the user‑experience and UI components for PackTrip AI, a web app that helps small groups plan and book trips in two stages:
+Define the user‑experience and UI components for TripSync AI, a web app that helps small groups plan and book trips in two stages:
 1. High‑level planning – align travel dates, budget, destination ideas.
 2. Detailed planning – pick concrete flights, lodging, restaurants, and activities; split costs and book. 
 

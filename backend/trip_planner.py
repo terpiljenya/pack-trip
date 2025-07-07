@@ -176,7 +176,7 @@ async def generate_trip_options_internal(trip_id: str, consensus_dates: list, db
             model="gpt-4o",
             messages=[{
                 "role": "system",
-                "content": """You are PackTrip AI, a travel planning expert specializing in group dynamics and conflict resolution. Generate 3 distinct trip itinerary options that address group preferences, resolve conflicts, and find common ground.
+                "content": """You are TripSync AI, a travel planning expert specializing in group dynamics and conflict resolution. Generate 3 distinct trip itinerary options that address group preferences, resolve conflicts, and find common ground.
 
 Your strategy:
 1. ANALYZE CONFLICTS: Identify where group members have different preferences

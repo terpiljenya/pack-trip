@@ -154,7 +154,7 @@ export default function LandingPage() {
             </div>
           </div>
           <h1 className="text-5xl font-bold text-gray-900 mb-4">
-            PackTrip AI
+            TripSync AI
           </h1>
           <p className="text-xl text-gray-600 max-w-xl mx-auto">
             The first group travel concierge that listens to everyone's preferences 
@@ -193,7 +193,7 @@ export default function LandingPage() {
                 Try Demo Trip
               </h3>
               <p className="text-gray-600 mb-6">
-                Experience PackTrip AI with our Barcelona demo
+                Experience TripSync AI with our Barcelona demo
               </p>
               <Button variant="outline" size="lg" className="w-full">
                 Join Barcelona Trip

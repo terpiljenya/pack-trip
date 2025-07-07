@@ -1,8 +1,8 @@
-# PackTrip AI - Replit Documentation
+# TripSync AI - Replit Documentation
 
 ## Overview
 
-PackTrip AI is a group travel planning application that facilitates collaborative trip planning through a chat-first interface. The application helps small groups coordinate travel dates, budgets, destinations, and booking details through real-time conversations and voting mechanisms.
+TripSync AI is a group travel planning application that facilitates collaborative trip planning through a chat-first interface. The application helps small groups coordinate travel dates, budgets, destinations, and booking details through real-time conversations and voting mechanisms.
 
 ## System Architecture
 

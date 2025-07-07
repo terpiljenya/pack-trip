@@ -445,7 +445,7 @@ async def create_trip(trip: schemas.TripCreate, db: Session = Depends(get_db)):
         user_id=None,
         type="agent",
         content=
-        f"Welcome to your {trip.destination} trip! I'm PackTrip AI, your travel assistant. I'll help you plan the perfect trip with your group. To get started, share your travel preferences and invite your friends to join!"
+        f"Welcome to your {trip.destination} trip! I'm TripSync AI, your travel assistant. I'll help you plan the perfect trip with your group. To get started, share your travel preferences and invite your friends to join!"
     )
     db.add(welcome_message)
 
@@ -1089,7 +1089,7 @@ async def reset_carol(request: dict, db: Session = Depends(get_db)):
             user_id=None,
             type="agent",
             content=
-            "Welcome to PackTrip AI! I'll help your group plan the perfect trip to Barcelona. Let's start by gathering everyone's preferences."
+            "Welcome to TripSync AI! I'll help your group plan the perfect trip to Barcelona. Let's start by gathering everyone's preferences."
         ),
         Message(
             trip_id=trip_id,
@@ -1390,7 +1390,7 @@ async def startup_event():
             user_id=None,
             type="system",
             content=
-            "Welcome to PackTrip AI! I'm your travel concierge. I'll help you plan the perfect Barcelona trip with your friends.",
+            "Welcome to TripSync AI! I'm your travel concierge. I'll help you plan the perfect Barcelona trip with your friends.",
             meta_data={"tripId": "BCN-2024-001"}),
         Message(
             trip_id="BCN-2024-001",

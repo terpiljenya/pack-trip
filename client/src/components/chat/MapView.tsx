@@ -50,6 +50,9 @@ const DEFAULT_CENTER: [number, number] = [41.3851, 2.1734]; // Barcelona fallbac
 // Cache for generated number icons to avoid recreating on each render
 const iconCache: Record<number, L.DivIcon> = {};
 
+// Simple in-memory cache for geocoding results to avoid duplicate network requests
+const geocodeResultCache: Record<string, [number, number]> = {};
+
 function getNumberIcon(day: number): L.DivIcon {
   if (iconCache[day]) return iconCache[day];
   const size = 30;
@@ -83,58 +86,87 @@ export default function MapView({ planData, destination }: MapViewProps) {
     if (!planData?.city_plans) return;
 
     const fetchCoords = async () => {
-      const results: MarkerData[] = [];
+      const queryMap = new Map<string, { day: number; activityName: string }[]>();
+
+      // Collect unique geocode queries
+      planData.city_plans.forEach((cityPlan, cityIdx) => {
+        cityPlan.day_plans.forEach((dayPlan, dayIdx) => {
+          dayPlan.activities.forEach((activity) => {
+            if (!activity.location) return;
+
+            const parts: string[] = [activity.location];
+            if (cityPlan.city) parts.push(cityPlan.city);
+            if (destination) parts.push(destination);
+
+            const query = parts.join(', ');
+            const entry = queryMap.get(query) || [];
+            entry.push({ day: dayIdx + 1, activityName: activity.name });
+            queryMap.set(query, entry);
+          });
+        });
+      });
+
+      // Function to geocode a single query (with cache)
+      const geocode = async (query: string): Promise<[number, number] | null> => {
+        if (geocodeResultCache[query]) return geocodeResultCache[query];
+        try {
+          const resp = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}`, {
+            headers: {
+              Accept: 'application/json',
+              'User-Agent': 'TripSyncAI/1.0 (+https://TripSync.ai)',
+            },
+          });
+          const data = await resp.json();
+          if (data && data.length > 0) {
+            const lat = parseFloat(data[0].lat);
+            const lon = parseFloat(data[0].lon);
+            geocodeResultCache[query] = [lat, lon];
+            return [lat, lon];
+          }
+        } catch (err) {
+          console.error('Geocoding failed', err);
+        }
+        return null;
+      };
+
+      // Perform all geocoding requests concurrently (bounded by browser fetch pool)
+      const geoResults = await Promise.all(
+        Array.from(queryMap.keys()).map(async (q) => ({ query: q, coords: await geocode(q) }))
+      );
+
+      const markersResult: MarkerData[] = [];
       let first: [number, number] | null = null;
       let boundsBuilder: LatLngBounds | null = null;
 
-      for (let cityIdx = 0; cityIdx < planData.city_plans.length; cityIdx++) {
-        const cityPlan = planData.city_plans[cityIdx];
-        for (let dayIdx = 0; dayIdx < cityPlan.day_plans.length; dayIdx++) {
-          const dayPlan = cityPlan.day_plans[dayIdx];
-          for (const activity of dayPlan.activities) {
-            if (!activity.location) continue;
-            const parts: string[] = [];
-            // Include the activity location text first
-            parts.push(activity.location);
-            // Add city name if available
-            if (cityPlan.city) parts.push(cityPlan.city);
-            // Finally append trip destination for better accuracy
-            if (destination) parts.push(destination);
+      geoResults.forEach(({ query, coords }) => {
+        if (!coords) return;
+        const [lat, lon] = coords;
+        if (!first) first = [lat, lon];
+        const entries = queryMap.get(query)!;
+        entries.forEach(({ day, activityName }) => {
+          markersResult.push({ position: [lat, lon], day, activityName });
+        });
 
-            const query = encodeURIComponent(parts.join(', '));
-            try {
-              const resp = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${query}`, {
-                headers: {
-                  'Accept': 'application/json',
-                  'User-Agent': 'PackTripAI/1.0 (+https://packtrip.ai)'
-                }
-              });
-              const data = await resp.json();
-              if (data && data.length > 0) {
-                const lat = parseFloat(data[0].lat);
-                const lon = parseFloat(data[0].lon);
-                if (!first) first = [lat, lon];
-                results.push({
-                  position: [lat, lon],
-                  day: dayIdx + 1,
-                  activityName: activity.name,
-                });
+        if (!boundsBuilder) {
+          boundsBuilder = new L.LatLngBounds([lat, lon], [lat, lon]);
+        } else {
+          boundsBuilder.extend([lat, lon]);
+        }
+      });
 
-                if (!boundsBuilder) {
-                  boundsBuilder = new L.LatLngBounds([lat, lon], [lat, lon]);
-                } else {
-                  boundsBuilder.extend([lat, lon]);
-                }
-              }
-            } catch (err) {
-              console.error('Geocoding failed', err);
-            }
-          }
+      // Fallback: if no markers found, geocode destination only
+      if (markersResult.length === 0 && destination) {
+        const coords = await geocode(destination);
+        if (coords) {
+          const [lat, lon] = coords;
+          markersResult.push({ position: [lat, lon], day: 1, activityName: destination });
+          boundsBuilder = new L.LatLngBounds([lat, lon], [lat, lon]);
+          if (!first) first = [lat, lon];
         }
       }
 
       if (first) setCenter(first);
-      setMarkers(results);
+      setMarkers(markersResult);
       setBounds(boundsBuilder);
     };
 
@@ -142,7 +174,7 @@ export default function MapView({ planData, destination }: MapViewProps) {
   }, [planData, destination]);
 
   return (
-    <MapContainer center={center} zoom={6} style={{ height: 400, width: '100%' }} scrollWheelZoom={true}>
+    <MapContainer center={center} zoom={6} style={{ height: 500, width: '100%' }} scrollWheelZoom={true}>
       <TileLayer
         attribution='&copy; OpenStreetMap contributors'
         url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"

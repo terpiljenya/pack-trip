@@ -196,7 +196,7 @@ export default function JoinPage() {
           </CardTitle>
           <CardDescription>
             {isDemo 
-              ? "Experience PackTrip AI with our Barcelona demo"
+              ? "Experience TripSync AI with our Barcelona demo"
               : "You've been invited to join a trip"
             }
           </CardDescription>
@@ -278,7 +278,7 @@ export default function JoinPage() {
           <div className="text-center text-sm text-gray-500">
             <p>
               {isDemo 
-                ? "No signup required - explore PackTrip AI instantly!"
+                ? "No signup required - explore TripSync AI instantly!"
                 : "No password required - just your name to get started!"
               }
             </p>

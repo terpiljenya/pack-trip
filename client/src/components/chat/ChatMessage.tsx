@@ -99,7 +99,7 @@ export default function ChatMessage({
         </Avatar>
         <div className="flex-1">
           <div className="flex items-center space-x-2 mb-1">
-            <span className="font-medium text-slate-900">PackTrip AI</span>
+            <span className="font-medium text-slate-900">TripSync AI</span>
             <span className="text-xs text-slate-500">
               {message.timestamp.toLocaleTimeString()}
             </span>
@@ -137,7 +137,7 @@ export default function ChatMessage({
         </Avatar>
         <div className="flex-1">
           <div className="flex items-center space-x-2 mb-1">
-            <span className="font-medium text-slate-900">PackTrip AI</span>
+            <span className="font-medium text-slate-900">TripSync AI</span>
             <span className="text-xs text-slate-500">
               {message.timestamp.toLocaleTimeString()}
             </span>

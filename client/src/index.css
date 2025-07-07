@@ -24,7 +24,7 @@
   --ring: hsl(20, 14.3%, 4.1%);
   --radius: 1rem;
   
-  /* Custom PackTrip colors */
+  /* Custom TripSync colors */
   --success: hsl(160, 100%, 39%);
   --warning: hsl(36, 100%, 64%);
   --danger: hsl(0, 84%, 67%);
@@ -52,7 +52,7 @@
   --ring: hsl(240, 4.9%, 83.9%);
   --radius: 1rem;
   
-  /* Custom PackTrip colors for dark mode */
+  /* Custom TripSync colors for dark mode */
   --success: hsl(160, 100%, 39%);
   --warning: hsl(36, 100%, 64%);
   --danger: hsl(0, 84%, 67%);
@@ -68,7 +68,7 @@
     font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   }
   
-  /* Custom shadow for PackTrip design */
+  /* Custom shadow for TripSync design */
   .shadow-custom {
     box-shadow: 0 0 8px rgba(0, 0, 0, 0.06);
   }
