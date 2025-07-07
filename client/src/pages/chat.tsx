@@ -23,8 +23,29 @@ import { apiRequest } from "@/lib/queryClient";
 
 export default function ChatPage() {
   const params = useParams();
-  const tripId = params.tripId || "BCN-2024-001";
-  const userId = 3; // Simulating Carol as the new user
+  const tripId = params.tripId;
+  
+  // Get user session from localStorage
+  const getUserSession = () => {
+    try {
+      const session = localStorage.getItem("pack_trip_user");
+      if (session) {
+        return JSON.parse(session);
+      }
+    } catch (error) {
+      console.error("Error reading user session:", error);
+    }
+    return null;
+  };
+  
+  const userSession = getUserSession();
+  const userId = userSession?.userId || 1; // Fallback to user 1 if no session
+  
+  // Redirect to landing page if no tripId provided
+  if (!tripId) {
+    window.location.href = "/";
+    return null;
+  }
   const isMobile = useIsMobile();
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [showPreferencesDialog, setShowPreferencesDialog] = useState(false);
@@ -33,6 +54,7 @@ export default function ChatPage() {
 
   const {
     tripContext,
+    trip,
     sendMessage,
     vote,
     setAvailability,
@@ -77,8 +99,8 @@ export default function ChatPage() {
 
   // Check if current user needs to submit preferences
   useEffect(() => {
-    if (missingPreferences?.missing_preferences) {
-      const userNeedsPreferences = missingPreferences.missing_preferences.some(
+    if (missingPreferences && (missingPreferences as any).missing_preferences) {
+      const userNeedsPreferences = (missingPreferences as any).missing_preferences.some(
         (user: any) => user.user_id === userId,
       );
       if (userNeedsPreferences && !preferences) {
@@ -133,6 +155,7 @@ export default function ChatPage() {
             <SheetContent side="right" className="w-full max-w-md p-0">
               <ContextDrawer
                 tripContext={tripContext}
+                trip={trip}
                 onVote={vote}
                 onSetAvailability={setAvailability}
                 onSetBatchAvailability={setBatchAvailability}
@@ -253,6 +276,7 @@ export default function ChatPage() {
         <div className="lg:w-3/10 bg-white border-l border-slate-200">
           <ContextDrawer
             tripContext={tripContext}
+            trip={trip}
             onVote={vote}
             onSetAvailability={setAvailability}
             onSetBatchAvailability={setBatchAvailability}

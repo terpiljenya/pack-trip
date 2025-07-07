@@ -6,9 +6,11 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { TripContext } from '@/types/trip';
+import { useToast } from '@/hooks/use-toast';
 
 interface ContextDrawerProps {
   tripContext: TripContext;
+  trip: any;
   onVote: (data: { optionId: string; emoji: string }) => void;
   onSetAvailability: (data: { date: Date; available: boolean }) => void;
   onSetBatchAvailability: (dates: Array<{ date: Date; available: boolean }>) => void;
@@ -69,12 +71,14 @@ function getRoadmapSteps(tripContext: TripContext): RoadmapStep[] {
 
 export default function ContextDrawer({ 
   tripContext, 
+  trip,
   onVote, 
   onSetAvailability, 
   onSetBatchAvailability, 
   userId 
 }: ContextDrawerProps) {
   const [activeTab, setActiveTab] = useState('roadmap');
+  const { toast } = useToast();
 
   const onlineParticipants = tripContext.participants.filter(p => p.isOnline);
   const offlineParticipants = tripContext.participants.filter(p => !p.isOnline);
@@ -297,7 +301,20 @@ export default function ContextDrawer({
           <CalendarPlus className="w-4 h-4 mr-2" />
           Add to Calendar
         </Button>
-        <Button variant="outline" className="w-full">
+        <Button 
+          variant="outline" 
+          className="w-full"
+          onClick={() => {
+            if (trip?.invite_token) {
+              const inviteUrl = `${window.location.origin}/join/${trip.trip_id}?token=${trip.invite_token}`;
+              navigator.clipboard.writeText(inviteUrl);
+              toast({
+                title: "Invite link copied!",
+                description: "Share this link with friends to invite them to the trip",
+              });
+            }
+          }}
+        >
           <Share2 className="w-4 h-4 mr-2" />
           Share Trip
         </Button>

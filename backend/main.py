@@ -10,6 +10,7 @@ from datetime import datetime
 import os
 from pathlib import Path
 from sqlalchemy import cast, String
+import secrets
 
 from .database import get_db, engine
 from .models import Base, User, Trip, TripParticipant, Message, Vote, DateAvailability, UserPreferences
@@ -168,12 +169,149 @@ async def get_trip(trip_id: str, db: Session = Depends(get_db)):
     return trip
 
 
+@app.get("/api/trips/{trip_id}/join-info")
+async def get_join_info(trip_id: str, token: str, db: Session = Depends(get_db)):
+    """Get trip information for joining via invite link"""
+    trip = db.query(Trip).filter(Trip.trip_id == trip_id, Trip.invite_token == token).first()
+    if not trip:
+        raise HTTPException(status_code=404, detail="Trip not found or invalid invite token")
+    
+    # Get participant count
+    participant_count = db.query(TripParticipant).filter(TripParticipant.trip_id == trip_id).count()
+    
+    return {
+        "trip_id": trip.trip_id,
+        "title": trip.title,
+        "destination": trip.destination,
+        "budget": trip.budget,
+        "participant_count": participant_count,
+        "valid_token": True
+    }
+
+
+@app.post("/api/trips/{trip_id}/join")
+async def join_trip(trip_id: str, token: str, user_info: dict, db: Session = Depends(get_db)):
+    """Join a trip via invite link"""
+    # Verify trip and token
+    trip = db.query(Trip).filter(Trip.trip_id == trip_id, Trip.invite_token == token).first()
+    if not trip:
+        raise HTTPException(status_code=404, detail="Trip not found or invalid invite token")
+    
+    # Create or get user
+    display_name = user_info.get("display_name", "").strip()
+    if not display_name:
+        raise HTTPException(status_code=400, detail="Display name is required")
+    
+    # Check if user with this display name already exists
+    existing_user = db.query(User).filter(User.display_name == display_name).first()
+    
+    if existing_user:
+        user_id = existing_user.id
+    else:
+        # Create new user with simple auth (no password)
+        username = display_name.lower().replace(" ", "_")
+        counter = 1
+        original_username = username
+        
+        # Ensure unique username
+        while db.query(User).filter(User.username == username).first():
+            username = f"{original_username}_{counter}"
+            counter += 1
+        
+        # Generate a random color for the user
+        colors = ["#3B82F6", "#10B981", "#8B5CF6", "#F59E0B", "#EF4444", "#06B6D4", "#84CC16", "#EC4899"]
+        user_color = secrets.choice(colors)
+        
+        new_user = User(
+            username=username,
+            password="",  # No password needed for simple auth
+            display_name=display_name,
+            color=user_color
+        )
+        db.add(new_user)
+        db.commit()
+        db.refresh(new_user)
+        user_id = new_user.id
+    
+    # Check if user is already a participant
+    existing_participant = db.query(TripParticipant).filter(
+        TripParticipant.trip_id == trip_id,
+        TripParticipant.user_id == user_id
+    ).first()
+    
+    if existing_participant:
+        return {"user_id": user_id, "message": "Already a participant"}
+    
+    # Add user as participant
+    participant = TripParticipant(
+        trip_id=trip_id,
+        user_id=user_id,
+        role="traveler",
+        has_submitted_preferences=False,
+        has_submitted_availability=False
+    )
+    db.add(participant)
+    
+    # Create join message
+    join_message = Message(
+        trip_id=trip_id,
+        user_id=None,
+        type="system",
+        content=f"{display_name} has joined the trip planning!"
+    )
+    db.add(join_message)
+    
+    db.commit()
+    
+    # Broadcast user joined
+    await manager.broadcast_to_trip(trip_id, {
+        "type": "user_joined",
+        "user_id": user_id,
+        "display_name": display_name,
+        "timestamp": datetime.utcnow().isoformat()
+    })
+    
+    return {"user_id": user_id, "message": "Successfully joined trip"}
+
+
 @app.post("/api/trips", response_model=schemas.Trip)
 async def create_trip(trip: schemas.TripCreate, db: Session = Depends(get_db)):
-    db_trip = Trip(**trip.dict())
+    # Generate unique invite token
+    invite_token = secrets.token_urlsafe(32)
+    
+    # Create trip with invite token
+    trip_data = trip.dict()
+    trip_data["invite_token"] = invite_token
+    db_trip = Trip(**trip_data)
     db.add(db_trip)
     db.commit()
     db.refresh(db_trip)
+    
+    # Auto-join creator as first participant (organizer)
+    # For now, we'll use user_id 1 (Alice) as default creator
+    # In production, this should come from authentication
+    creator_id = 1
+    
+    # Create participant record
+    participant = TripParticipant(
+        trip_id=trip.trip_id,
+        user_id=creator_id,
+        role="organizer",
+        has_submitted_preferences=False,
+        has_submitted_availability=False
+    )
+    db.add(participant)
+    
+    # Create welcome message
+    welcome_message = Message(
+        trip_id=trip.trip_id,
+        user_id=None,
+        type="agent",
+        content=f"Welcome to your {trip.destination} trip! I'm PackTrip AI, your travel concierge. I'll help you plan the perfect trip with your group. To get started, share your travel preferences and invite your friends to join!"
+    )
+    db.add(welcome_message)
+    
+    db.commit()
     return db_trip
 
 
@@ -1231,7 +1369,8 @@ async def startup_event():
                      title="Barcelona Trip Planning",
                      destination="Barcelona",
                      budget=3600,
-                     state="COLLECTING_DATES")
+                     state="COLLECTING_DATES",
+                     invite_token=secrets.token_urlsafe(32))
     db.add(demo_trip)
     db.commit()
 

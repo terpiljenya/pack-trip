@@ -54,6 +54,7 @@ class TripCreate(TripBase):
 
 class Trip(TripBase):
     id: int
+    invite_token: str
     created_at: datetime
     updated_at: datetime
     

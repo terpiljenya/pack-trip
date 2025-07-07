@@ -472,6 +472,7 @@ export function useTripState(tripId: string, userId: number) {
 
   return {
     tripContext,
+    trip,
     sendMessage: sendMessageMutation.mutate,
     vote: voteMutation.mutate,
     setAvailability: setAvailabilityMutation.mutate,
