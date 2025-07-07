@@ -42,10 +42,13 @@ interface DetailedPlanCardProps {
 }
 
 export default function DetailedPlanCard({ planData }: DetailedPlanCardProps) {
-  const [expandedKey, setExpandedKey] = useState<string | null>(null);
+  // Track multiple expanded day keys so that each day can be toggled independently
+  const [expandedKeys, setExpandedKeys] = useState<string[]>([]);
 
   const toggleDay = (key: string) => {
-    setExpandedKey(expandedKey === key ? null : key);
+    setExpandedKeys((prev) =>
+      prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key]
+    );
   };
 
   const formatDate = (dateStr: string) => {
@@ -104,12 +107,12 @@ export default function DetailedPlanCard({ planData }: DetailedPlanCardProps) {
                         {formatDate(dayPlan.date)}
                       </span>
                       <Button variant="ghost" size="sm">
-                        {expandedKey === key ? "−" : "+"}
+                        {expandedKeys.includes(key) ? "−" : "+"}
                       </Button>
                     </CardTitle>
                   </CardHeader>
 
-                  {expandedKey === key && (
+                  {expandedKeys.includes(key) && (
                     <CardContent className="pt-0 space-y-4">
                       {dayPlan.activities.map((activity, aIdx) => (
                         <div

@@ -86,7 +86,7 @@ async def generate_detailed_trip_plan(trip_id: str, winning_option: dict,
             "arrival_date": trip.start_date.strftime("%Y-%m-%d") if trip.start_date else datetime.utcnow().strftime("%Y-%m-%d"),
             "departure_date": trip.end_date.strftime("%Y-%m-%d") if trip.end_date else (datetime.utcnow() + timedelta(days=3)).strftime("%Y-%m-%d"),
             "age": 30,
-            "preferences": context["all_raw_preferences"] or None
+            "preferences": context["all_raw_preferences"] + [context["description"]] or None
         }
 
         payload = {

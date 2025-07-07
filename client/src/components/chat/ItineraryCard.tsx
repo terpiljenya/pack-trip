@@ -155,9 +155,14 @@ export default function ItineraryCard({
           <CardTitle className="font-semibold text-slate-900 text-lg">{option.title}</CardTitle>
           <div className="flex items-center gap-2">
             {option.price && (
-              <span className="text-lg font-bold text-emerald-600">
-                €{option.price.toLocaleString()}
-              </span>
+              <div className="flex flex-col items-end">
+                <span className="text-lg font-bold text-emerald-600">
+                  €{option.price.toLocaleString()}
+                </span>
+                <span className="text-[10px] text-slate-500 leading-none">
+                  excludes hotels and flights
+                </span>
+              </div>
             )}
           </div>
         </div>
