@@ -232,24 +232,22 @@ export default function ItineraryCard({
                   <div className="flex items-center justify-between mb-2">
                     <h4 className="text-sm font-medium text-slate-700">Highlights:</h4>
                     {structuredPlan && (
-                      <Button
-                        variant="outline"
-                        size="sm"
+                      <div
                         onClick={() => setIsExpanded(!isExpanded)}
-                        className="h-6 px-2 text-xs"
+                        className="flex items-center cursor-pointer text-slate-500 hover:text-slate-700 transition-colors"
                       >
                         {isExpanded ? (
                           <>
                             <ChevronUp className="w-3 h-3 mr-1" />
-                            Less
+                            <span className="text-xs">Less</span>
                           </>
                         ) : (
                           <>
                             <ChevronDown className="w-3 h-3 mr-1" />
-                            Details
+                            <span className="text-xs">Details</span>
                           </>
                         )}
-                      </Button>
+                      </div>
                     )}
                   </div>
                   <div className="space-y-1">
@@ -271,15 +269,13 @@ export default function ItineraryCard({
               /* Expanded view - show detailed day plans */
               <div className="flex items-center justify-between mb-2">
                 <h4 className="text-sm font-medium text-slate-700">Daily Itinerary:</h4>
-                <Button
-                  variant="outline"
-                  size="sm"
+                <div
                   onClick={() => setIsExpanded(!isExpanded)}
-                  className="h-6 px-2 text-xs"
+                  className="flex items-center cursor-pointer text-slate-500 hover:text-slate-700 transition-colors"
                 >
                   <ChevronUp className="w-3 h-3 mr-1" />
-                  Less
-                </Button>
+                  <span className="text-xs">Less</span>
+                </div>
               </div>
             )}
           </div>
