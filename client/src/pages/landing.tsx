@@ -157,7 +157,7 @@ export default function LandingPage() {
             TripSync AI
           </h1>
           <p className="text-xl text-gray-600 max-w-xl mx-auto">
-            The first group travel concierge that listens to everyone's preferences 
+            The first group travel assistant that listens to everyone's preferences 
             and creates the perfect trip for your crew
           </p>
         </div>

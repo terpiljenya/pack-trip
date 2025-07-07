@@ -1390,7 +1390,7 @@ async def startup_event():
             user_id=None,
             type="system",
             content=
-            "Welcome to TripSync AI! I'm your travel concierge. I'll help you plan the perfect Barcelona trip with your friends.",
+            "Welcome to TripSync AI! I'm your travel a. I'll help you plan the perfect Barcelona trip with your friends.",
             meta_data={"tripId": "BCN-2024-001"}),
         Message(
             trip_id="BCN-2024-001",

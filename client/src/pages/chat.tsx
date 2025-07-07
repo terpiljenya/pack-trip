@@ -201,7 +201,7 @@ export default function ChatPage() {
       )}
 
       {/* Main Chat Area */}
-      <div className="flex-1 flex flex-col lg:w-2/3">
+      <div className="flex-1 flex flex-col lg:w-3/4">
         {/* Desktop Header */}
         {!isMobile && (
           <div className="bg-white border-b border-slate-200 px-6 py-4 flex items-center justify-between">
@@ -319,7 +319,7 @@ export default function ChatPage() {
 
       {/* Desktop Context Drawer */}
       {!isMobile && (
-        <div className="lg:w-1/3 bg-white border-l border-slate-200 min-w-[380px]">
+        <div className="lg:w-1/4 bg-white border-l border-slate-200 min-w-[320px]">
           <ContextDrawer
             tripContext={tripContext}
             trip={tripData}

@@ -40,13 +40,8 @@ const STATE_ORDER: TripState[] = [
 function getRoadmapSteps(tripContext: TripContext): RoadmapStep[] {
   const stepDefinitions: Array<{ title: string; description: string; state: TripState }> = [
     {
-      title: 'Share Travel Preferences',
-      description: 'Each traveler shares their budget, travel style, and interests',
-      state: 'COLLECTING_PREFS',
-    },
-    {
-      title: 'Select Available Dates',
-      description: 'Mark dates when everyone can travel on the calendar',
+      title: 'Share Preferences and Available Dates',
+      description: 'Mark dates and share your travel preferences',
       state: 'COLLECTING_DATES',
     },
     {
@@ -116,6 +111,8 @@ export default function ContextDrawer({
                 <div key={index} className="flex items-start space-x-3">
                   {step.completed ? (
                     <CheckCircle2 className="w-5 h-5 text-green-600 mt-0.5" />
+                  ) : step.current ? (
+                    <Circle className="w-5 h-5 text-blue-600 mt-0.5" />
                   ) : (
                     <Circle className="w-5 h-5 text-slate-300 mt-0.5" />
                   )}
@@ -124,9 +121,6 @@ export default function ContextDrawer({
                       <h4 className={`text-sm font-medium ${step.completed ? 'text-slate-900' : 'text-slate-500'}`}>
                         {step.title}
                       </h4>
-                      {step.current && (
-                        <Badge variant="secondary" className="text-xs">Current</Badge>
-                      )}
                     </div>
                     <p className={`text-xs mt-1 ${step.completed ? 'text-slate-600' : 'text-slate-400'}`}>
                       {step.description}

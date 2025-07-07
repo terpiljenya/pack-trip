@@ -102,7 +102,7 @@ export default function JoinPage() {
     try {
       await joinMutation.mutateAsync({ 
         display_name: displayName.trim(),
-        home_city: homeCity.trim() || undefined
+        home_city: homeCity.trim() || 'Paris'
       });
     } finally {
       setIsJoining(false);
