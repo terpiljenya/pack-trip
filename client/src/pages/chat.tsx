@@ -198,7 +198,7 @@ export default function ChatPage() {
                     const response = await fetch("/api/reset-carol", {
                       method: "POST",
                       headers: { "Content-Type": "application/json" },
-                      body: JSON.stringify({ tripId, userId }),
+                      body: JSON.stringify({ tripId, userId: 3 }),
                     });
                     if (response.ok) {
                       window.location.reload();
