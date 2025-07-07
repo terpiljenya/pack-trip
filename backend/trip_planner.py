@@ -29,11 +29,18 @@ class Activity(BaseModel):
 class DayPlan(BaseModel):
     activities: List[Activity] = Field(
         ...,
-        description=dedent("""
+        alias="acitivites",  # The external API returns a misspelled key
+        description=dedent(
+            """
             List of things to do or places to visit; not limited to any particular activity type;
             Could be restaurants, museums, river boats, landmarks to visit, etc...
-        """)
+        """
+        ),
     )
+
+    model_config = {
+        "populate_by_name": True
+    }
 
 
 # Define response models
@@ -123,18 +130,20 @@ async def generate_trip_options_internal(trip_id: str, consensus_dates: list, db
             }
             grouped_preferences.append(user_prefs)
 
-        # Build context for AI including grouped preferences and conflict analysis
-        context = {
+        # Build payload for the external Preliminary Plan API
+        # NOTE: The external API expects the field name "consesnsus_dates" (with a typo)
+        #       so we must preserve that exact spelling to avoid a validation error.
+        payload = {
             "destination": trip.destination or "Barcelona",
-            "budget": trip.budget,
-            "consensus_dates": consensus_dates,  # list of dates in YYYY-MM-DD format
+            # "budget": trip.budget,
+            "consesnsus_dates": consensus_dates,  # list of dates in YYYY-MM-DD format
             "grouped_preferences": grouped_preferences,
         }
 
         # Generate personalized trip options using AI with structured output
         try:
             async with httpx.AsyncClient(timeout=200.0) as client:
-                api_response = await client.post(f"{EXTERNAL_API_BASE_URL}/plan_itinerary", json=context)
+                api_response = await client.post(f"{EXTERNAL_API_BASE_URL}/preliminary_plan", json=payload)
                 print(api_response.json())
                 # api_response.raise_for_status()
                 proposed_plans = ProposedPlans.model_validate_json(api_response.text)
@@ -149,7 +158,7 @@ async def generate_trip_options_internal(trip_id: str, consensus_dates: list, db
         legacy_options = []
         for i, plan in enumerate(proposed_plans.plans):
             # Calculate estimated price per person
-            price_per_person = context['budget'] // len(context['grouped_preferences']) if context['budget'] and len(context['grouped_preferences']) > 0 else 500
+            price_per_person = payload['budget'] // len(payload['grouped_preferences']) if payload['budget'] and len(payload['grouped_preferences']) > 0 else 500
             
             # Create highlights from activities
             highlights = []
@@ -167,7 +176,7 @@ async def generate_trip_options_internal(trip_id: str, consensus_dates: list, db
                 "type": "itinerary",
                 "title": plan.name,
                 "description": plan.summary,
-                "price": price_per_person,
+                "price": sum(activity.cost for activity in plan.day_plans[0].activities),
                 "image": image_url,
                 "meta_data": {
                     "duration": f"{plan.duration_days} days",
@@ -201,7 +210,7 @@ async def generate_trip_options_internal(trip_id: str, consensus_dates: list, db
 
         # Create personalized consensus message
         consensus_message = f"🎉 **Consensus Reached!**\n\nGreat news! Everyone is available on {len(consensus_dates)} dates. Based on your group's preferences"
-        consensus_message += f", I've generated 3 personalized itinerary options for your {context['destination']} trip."
+        consensus_message += f", I've generated 3 personalized itinerary options for your {payload['destination']} trip."
         consensus_message += "\n\n✨ **Each option addresses your specific interests and preferences!**\n\nVote for your favorite option below!"
 
         db_message = Message(
