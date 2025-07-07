@@ -68,14 +68,18 @@ class ConnectionManager:
                                 exclude: WebSocket = None):
         if trip_id in self.active_connections:
             connection_count = len(self.active_connections[trip_id])
-            print(f"DEBUG: Broadcasting to {connection_count} connections for trip {trip_id}: {message.get('type', 'unknown')}")
-            
+            print(
+                f"DEBUG: Broadcasting to {connection_count} connections for trip {trip_id}: {message.get('type', 'unknown')}"
+            )
+
             for connection in self.active_connections[trip_id]:
                 if connection != exclude:
                     try:
                         await connection.send_json(message)
                     except Exception as e:
-                        print(f"DEBUG: Failed to send message to connection: {e}")
+                        print(
+                            f"DEBUG: Failed to send message to connection: {e}"
+                        )
                         pass
         else:
             print(f"DEBUG: No active connections for trip {trip_id}")
@@ -98,7 +102,9 @@ async def websocket_endpoint(websocket: WebSocket):
             if data["type"] == "join_trip":
                 trip_id = data["tripId"]
                 user_id = data["userId"]
-                print(f"DEBUG: User {user_id} joining trip {trip_id} via WebSocket")
+                print(
+                    f"DEBUG: User {user_id} joining trip {trip_id} via WebSocket"
+                )
                 await manager.connect(websocket, trip_id)
 
                 # Update participant online status
@@ -181,15 +187,20 @@ async def get_trip(trip_id: str, db: Session = Depends(get_db)):
 
 
 @app.get("/api/trips/{trip_id}/join-info")
-async def get_join_info(trip_id: str, token: str, db: Session = Depends(get_db)):
+async def get_join_info(trip_id: str,
+                        token: str,
+                        db: Session = Depends(get_db)):
     """Get trip information for joining via invite link"""
-    trip = db.query(Trip).filter(Trip.trip_id == trip_id, Trip.invite_token == token).first()
+    trip = db.query(Trip).filter(Trip.trip_id == trip_id,
+                                 Trip.invite_token == token).first()
     if not trip:
-        raise HTTPException(status_code=404, detail="Trip not found or invalid invite token")
-    
+        raise HTTPException(status_code=404,
+                            detail="Trip not found or invalid invite token")
+
     # Get participant count
-    participant_count = db.query(TripParticipant).filter(TripParticipant.trip_id == trip_id).count()
-    
+    participant_count = db.query(TripParticipant).filter(
+        TripParticipant.trip_id == trip_id).count()
+
     return {
         "trip_id": trip.trip_id,
         "title": trip.title,
@@ -201,21 +212,27 @@ async def get_join_info(trip_id: str, token: str, db: Session = Depends(get_db))
 
 
 @app.post("/api/trips/{trip_id}/join")
-async def join_trip(trip_id: str, token: str, user_info: dict, db: Session = Depends(get_db)):
+async def join_trip(trip_id: str,
+                    token: str,
+                    user_info: dict,
+                    db: Session = Depends(get_db)):
     """Join a trip via invite link"""
     # Verify trip and token
-    trip = db.query(Trip).filter(Trip.trip_id == trip_id, Trip.invite_token == token).first()
+    trip = db.query(Trip).filter(Trip.trip_id == trip_id,
+                                 Trip.invite_token == token).first()
     if not trip:
-        raise HTTPException(status_code=404, detail="Trip not found or invalid invite token")
-    
+        raise HTTPException(status_code=404,
+                            detail="Trip not found or invalid invite token")
+
     # Create or get user
     display_name = user_info.get("display_name", "").strip()
     if not display_name:
         raise HTTPException(status_code=400, detail="Display name is required")
-    
+
     # Check if user with this display name already exists
-    existing_user = db.query(User).filter(User.display_name == display_name).first()
-    
+    existing_user = db.query(User).filter(
+        User.display_name == display_name).first()
+
     if existing_user:
         user_id = existing_user.id
     else:
@@ -223,80 +240,80 @@ async def join_trip(trip_id: str, token: str, user_info: dict, db: Session = Dep
         username = display_name.lower().replace(" ", "_")
         counter = 1
         original_username = username
-        
+
         # Ensure unique username
         while db.query(User).filter(User.username == username).first():
             username = f"{original_username}_{counter}"
             counter += 1
-        
+
         # Generate a random color for the user
-        colors = ["#3B82F6", "#10B981", "#8B5CF6", "#F59E0B", "#EF4444", "#06B6D4", "#84CC16", "#EC4899"]
+        colors = [
+            "#3B82F6", "#10B981", "#8B5CF6", "#F59E0B", "#EF4444", "#06B6D4",
+            "#84CC16", "#EC4899"
+        ]
         user_color = secrets.choice(colors)
-        
+
         new_user = User(
             username=username,
             password="",  # No password needed for simple auth
             display_name=display_name,
-            color=user_color
-        )
+            color=user_color)
         db.add(new_user)
         db.commit()
         db.refresh(new_user)
         user_id = new_user.id
-    
+
     # Check if user is already a participant
     existing_participant = db.query(TripParticipant).filter(
         TripParticipant.trip_id == trip_id,
-        TripParticipant.user_id == user_id
-    ).first()
-    
+        TripParticipant.user_id == user_id).first()
+
     if existing_participant:
         return {"user_id": user_id, "message": "Already a participant"}
-    
+
     # Add user as participant
-    participant = TripParticipant(
-        trip_id=trip_id,
-        user_id=user_id,
-        role="traveler",
-        has_submitted_preferences=False,
-        has_submitted_availability=False
-    )
+    participant = TripParticipant(trip_id=trip_id,
+                                  user_id=user_id,
+                                  role="traveler",
+                                  has_submitted_preferences=False,
+                                  has_submitted_availability=False)
     db.add(participant)
-    
+
     # Create join message
     join_message = Message(
         trip_id=trip_id,
         user_id=None,
         type="system",
-        content=f"{display_name} has joined the trip planning!"
-    )
+        content=f"{display_name} has joined the trip planning!")
     db.add(join_message)
-    
+
     db.commit()
-    
+
     # Broadcast new join message
     db.refresh(join_message)
-    await manager.broadcast_to_trip(trip_id, {
-        "type": "new_message",
-        "message": {
-            "id": join_message.id,
-            "trip_id": join_message.trip_id,
-            "user_id": join_message.user_id,
-            "type": join_message.type,
-            "content": join_message.content,
-            "timestamp": join_message.timestamp.isoformat()
-        },
-        "timestamp": datetime.utcnow().isoformat()
-    })
-    
+    await manager.broadcast_to_trip(
+        trip_id, {
+            "type": "new_message",
+            "message": {
+                "id": join_message.id,
+                "trip_id": join_message.trip_id,
+                "user_id": join_message.user_id,
+                "type": join_message.type,
+                "content": join_message.content,
+                "timestamp": join_message.timestamp.isoformat()
+            },
+            "timestamp": datetime.utcnow().isoformat()
+        })
+
     # Also broadcast user joined event
-    await manager.broadcast_to_trip(trip_id, {
-        "type": "user_joined",
-        "user_id": user_id,
-        "display_name": display_name,
-        "timestamp": datetime.utcnow().isoformat()
-    })
-    
+    await manager.broadcast_to_trip(
+        trip_id, {
+            "type": "user_joined",
+            "user_id": user_id,
+            "display_name": display_name,
+            "timestamp": datetime.utcnow().isoformat()
+        })
+
     return {"user_id": user_id, "message": "Successfully joined trip"}
 
 
@@ -304,7 +321,7 @@ async def join_trip(trip_id: str, token: str, user_info: dict, db: Session = Dep
 async def create_trip(trip: schemas.TripCreate, db: Session = Depends(get_db)):
     # Generate unique invite token
     invite_token = secrets.token_urlsafe(32)
-    
+
     # Create trip with invite token
     trip_data = trip.dict()
     trip_data["invite_token"] = invite_token
@@ -312,31 +329,30 @@ async def create_trip(trip: schemas.TripCreate, db: Session = Depends(get_db)):
     db.add(db_trip)
     db.commit()
     db.refresh(db_trip)
-    
+
     # Auto-join creator as first participant (organizer)
     # For now, we'll use user_id 1 (Alice) as default creator
     # In production, this should come from authentication
     creator_id = 1
-    
+
     # Create participant record
-    participant = TripParticipant(
-        trip_id=trip.trip_id,
-        user_id=creator_id,
-        role="organizer",
-        has_submitted_preferences=False,
-        has_submitted_availability=False
-    )
+    participant = TripParticipant(trip_id=trip.trip_id,
+                                  user_id=creator_id,
+                                  role="organizer",
+                                  has_submitted_preferences=False,
+                                  has_submitted_availability=False)
     db.add(participant)
-    
+
     # Create welcome message
     welcome_message = Message(
         trip_id=trip.trip_id,
         user_id=None,
         type="agent",
-        content=f"Welcome to your {trip.destination} trip! I'm PackTrip AI, your travel assistant. I'll help you plan the perfect trip with your group. To get started, share your travel preferences and invite your friends to join!"
+        content=
+        f"Welcome to your {trip.destination} trip! I'm PackTrip AI, your travel assistant. I'll help you plan the perfect trip with your group. To get started, share your travel preferences and invite your friends to join!"
     )
     db.add(welcome_message)
-    
+
     db.commit()
     return db_trip
 
@@ -358,7 +374,7 @@ async def create_message(trip_id: str,
     db.commit()
     db.refresh(db_message)
 
-    # Broadcast new message  
+    # Broadcast new message
     await manager.broadcast_to_trip(
         trip_id, {
             "type": "new_message",
@@ -377,37 +393,35 @@ async def create_message(trip_id: str,
     # Process message with AI agent if it's a user message
     if message.type == "user" and message.user_id:
         try:
-            analysis = await ai_agent.analyze_message(
-                message.content, 
-                trip_id, 
-                message.user_id, 
-                db
-            )
-            
+            analysis = await ai_agent.analyze_message(message.content, trip_id,
+                                                      message.user_id, db)
+
             # Generate agent response if needed
-            if analysis.get("response_needed") and analysis.get("calendar_response"):
+            if analysis.get("response_needed") and analysis.get(
+                    "calendar_response"):
                 calendar_metadata = {
-                    "type": "calendar_suggestion", 
+                    "type": "calendar_suggestion",
                     "intent": analysis["intent"]
                 }
-                
+
                 # Add calendar month/year if extracted
                 if analysis.get("calendar_month"):
-                    calendar_metadata["calendar_month"] = analysis["calendar_month"]
+                    calendar_metadata["calendar_month"] = analysis[
+                        "calendar_month"]
                 if analysis.get("calendar_year"):
-                    calendar_metadata["calendar_year"] = analysis["calendar_year"]
-                
+                    calendar_metadata["calendar_year"] = analysis[
+                        "calendar_year"]
+
                 agent_message = Message(
                     trip_id=trip_id,
                     user_id=None,  # Agent message
                     type="agent",
                     content=analysis["calendar_response"],
-                    meta_data=calendar_metadata
-                )
+                    meta_data=calendar_metadata)
                 db.add(agent_message)
                 db.commit()
                 db.refresh(agent_message)
-                
+
                 # Broadcast agent response
                 await manager.broadcast_to_trip(
                     trip_id, {
@@ -423,20 +437,23 @@ async def create_message(trip_id: str,
                         },
                         "timestamp": datetime.utcnow().isoformat()
                     })
-            
+
             # Notify about extracted preferences if any
             if analysis.get("extracted_preferences"):
                 preferences_message = Message(
                     trip_id=trip_id,
                     user_id=None,  # Agent message
                     type="agent",
-                    content=f"✨ I've noted your preferences: {', '.join(analysis['extracted_preferences'].keys())}. These will help me suggest better options for your trip!",
-                    meta_data={"type": "preferences_extracted", "preferences": analysis["extracted_preferences"]}
-                )
+                    content=
+                    f"✨ I've noted your preferences: {', '.join(analysis['extracted_preferences'].keys())}. These will help me suggest better options for your trip!",
+                    meta_data={
+                        "type": "preferences_extracted",
+                        "preferences": analysis["extracted_preferences"]
+                    })
                 db.add(preferences_message)
                 db.commit()
                 db.refresh(preferences_message)
-                
+
                 # Broadcast preferences notification
                 await manager.broadcast_to_trip(
                     trip_id, {
@@ -447,12 +464,13 @@ async def create_message(trip_id: str,
                             "user_id": preferences_message.user_id,
                             "type": preferences_message.type,
                             "content": preferences_message.content,
-                            "timestamp": preferences_message.timestamp.isoformat(),
+                            "timestamp":
+                            preferences_message.timestamp.isoformat(),
                             "metadata": preferences_message.meta_data
                         },
                         "timestamp": datetime.utcnow().isoformat()
                     })
-                    
+
         except Exception as e:
             print(f"Error processing message with AI agent: {e}")
             # Continue without AI processing if there's an error
@@ -533,17 +551,17 @@ async def check_voting_consensus(trip_id: str, db: Session):
         TripParticipant.trip_id == trip_id).all()
     votes = db.query(Vote).filter(Vote.trip_id == trip_id,
                                   Vote.emoji == "👍").all()
-    
+
     # Find the agent message containing trip options
     options_message: Optional[Message] = None
     agent_messages = db.query(Message).filter(
-        Message.trip_id == trip_id,
-        Message.type == "agent",
-        Message.meta_data.isnot(None)
-    ).order_by(Message.timestamp.desc()).all()
+        Message.trip_id == trip_id, Message.type == "agent",
+        Message.meta_data.isnot(None)).order_by(
+            Message.timestamp.desc()).all()
 
     for msg in agent_messages:
-        if isinstance(msg.meta_data, dict) and msg.meta_data.get("type") == "trip_options":
+        if isinstance(msg.meta_data,
+                      dict) and msg.meta_data.get("type") == "trip_options":
             options_message = msg
             break
 
@@ -576,7 +594,8 @@ async def check_voting_consensus(trip_id: str, db: Session):
         unique_voters = set(vote.user_id for vote in option_votes)
         if len(unique_voters) == total_participants:
             winning_option = next(
-                (opt for opt in options if opt["option_id"] == option_id), None)
+                (opt for opt in options if opt["option_id"] == option_id),
+                None)
             break
 
     if winning_option:
@@ -604,8 +623,9 @@ async def check_availability_consensus(trip_id: str, db: Session):
         return
 
     # Find participants who have submitted any availability data
-    participants_with_availability = set(avail.user_id for avail in availability)
-    
+    participants_with_availability = set(avail.user_id
+                                         for avail in availability)
+
     # Only consider participants who have submitted availability data
     # This prevents users who haven't marked any dates from blocking consensus
     if len(participants_with_availability) < 2:
@@ -649,10 +669,9 @@ async def generate_trip_options_internal(trip_id: str, consensus_dates: list,
 
         # Check if consensus message already exists
         existing_message = db.query(Message).filter(
-            Message.trip_id == trip_id,
-            Message.type == "agent",
+            Message.trip_id == trip_id, Message.type == "agent",
             Message.content.like("%Consensus Reached%")).first()
-        
+
         if existing_message:
             return
 
@@ -710,20 +729,20 @@ async def generate_trip_options_internal(trip_id: str, consensus_dates: list,
             consensus_dates[:3]) + "\n\nVote for your favorite option below!"
 
         db_message = Message(trip_id=trip_id,
-                           user_id=None,
-                           type="agent",
-                           content=consensus_message,
-                           meta_data={
-                               "type": "trip_options",
-                               "options": options,
-                               "consensus_dates": consensus_dates
-                           })
-        
+                             user_id=None,
+                             type="agent",
+                             content=consensus_message,
+                             meta_data={
+                                 "type": "trip_options",
+                                 "options": options,
+                                 "consensus_dates": consensus_dates
+                             })
+
         db.add(db_message)
 
         # Update trip state
         trip.state = "VOTING_HIGH_LEVEL"
-        
+
         db.commit()
 
         # Refresh the message to get the ID
@@ -738,11 +757,12 @@ async def generate_trip_options_internal(trip_id: str, consensus_dates: list,
             "id": db_message.id,
             "trip_id": db_message.trip_id,
             "user_id": db_message.user_id,
-            "timestamp": db_message.timestamp.isoformat()  # Convert datetime to string
+            "timestamp":
+            db_message.timestamp.isoformat()  # Convert datetime to string
         }
 
         print(f"DEBUG: Broadcasting new message: {message_dict}")
-        
+
         await manager.broadcast_to_trip(
             trip_id, {
                 "type": "new_message",
@@ -1020,13 +1040,13 @@ async def get_trip_options(trip_id: str, db: Session = Depends(get_db)):
     # Find the agent message containing trip options
     options_message: Optional[Message] = None
     agent_messages = db.query(Message).filter(
-        Message.trip_id == trip_id,
-        Message.type == "agent",
-        Message.meta_data.isnot(None)
-    ).order_by(Message.timestamp.desc()).all()
+        Message.trip_id == trip_id, Message.type == "agent",
+        Message.meta_data.isnot(None)).order_by(
+            Message.timestamp.desc()).all()
 
     for msg in agent_messages:
-        if isinstance(msg.meta_data, dict) and msg.meta_data.get("type") == "trip_options":
+        if isinstance(msg.meta_data,
+                      dict) and msg.meta_data.get("type") == "trip_options":
             options_message = msg
             break
 
@@ -1090,7 +1110,7 @@ async def set_availability_batch(trip_id: str,
                                  db: Session = Depends(get_db)):
     """Set multiple availability dates for a user at once."""
     user_id = batch.user_id
-    
+
     # Process all dates in the batch
     for date_availability in batch.dates:
         # Check if availability already exists
@@ -1106,8 +1126,7 @@ async def set_availability_batch(trip_id: str,
                 trip_id=trip_id,
                 user_id=user_id,
                 date=date_availability.date,
-                available=date_availability.available
-            )
+                available=date_availability.available)
             db.add(db_availability)
 
     db.commit()
@@ -1199,18 +1218,19 @@ async def set_preferences(
 
     # Broadcast new message
     db.refresh(system_message)
-    await manager.broadcast_to_trip(trip_id, {
-        "type": "new_message",
-        "message": {
-            "id": system_message.id,
-            "trip_id": system_message.trip_id,
-            "user_id": system_message.user_id,
-            "type": system_message.type,
-            "content": system_message.content,
-            "timestamp": system_message.timestamp.isoformat()
-        },
-        "timestamp": datetime.utcnow().isoformat()
-    })
+    await manager.broadcast_to_trip(
+        trip_id, {
+            "type": "new_message",
+            "message": {
+                "id": system_message.id,
+                "trip_id": system_message.trip_id,
+                "user_id": system_message.user_id,
+                "type": system_message.type,
+                "content": system_message.content,
+                "timestamp": system_message.timestamp.isoformat()
+            },
+            "timestamp": datetime.utcnow().isoformat()
+        })
 
     # Since we start with COLLECTING_DATES, we don't need state transitions here
     # Just provide helpful guidance after preferences are submitted
@@ -1331,7 +1351,6 @@ async def reset_carol(request: dict, db: Session = Depends(get_db)):
             trip_id=trip_id,
             user_id=None,
             type="agent",
-            meta_data={"type": "calendar_suggestion"},
             content=
             "Great to have everyone here! I see we're planning for October with a budget of around $1,200 per person for 5 days. To create the perfect itinerary for your group, I'll need to understand everyone's preferences.\n\nAlice and Bob - you've shared your travel styles, and I see Carol just joined us. Carol, could you share your preferences too?"
         ),
@@ -1346,6 +1365,11 @@ async def reset_carol(request: dict, db: Session = Depends(get_db)):
             trip_id=trip_id,
             user_id=None,
             type="agent",
+            meta_data={
+                "type": "calendar_suggestion",
+                "calendar_month": 10,
+                "calendar_year": 2025
+            },
             content=
             "Excellent! Barcelona in October is a fantastic choice. Now let's coordinate your dates - I need everyone to mark their availability on the calendar below. Click on the dates you're available to travel!"
         ),
@@ -1438,24 +1462,22 @@ async def reset_carol(request: dict, db: Session = Depends(get_db)):
 
     # Clear existing votes
     db.query(Vote).filter(Vote.trip_id == trip_id).delete()
-    
+
     # Add votes for Alice and Bob on the first option ("cultural")
     alice_vote = Vote(
         trip_id=trip_id,
         user_id=1,  # Alice
         option_id="cultural",
-        emoji="👍"
-    )
+        emoji="👍")
     db.add(alice_vote)
-    
+
     bob_vote = Vote(
         trip_id=trip_id,
         user_id=2,  # Bob
         option_id="cultural",
-        emoji="👍"
-    )
+        emoji="👍")
     db.add(bob_vote)
-    
+
     db.commit()
 
     db.commit()
@@ -1604,7 +1626,11 @@ async def startup_event():
             trip_id="BCN-2024-001",
             user_id=None,
             type="agent",
-            meta_data={"type": "calendar_suggestion"},
+            meta_data={
+                "type": "calendar_suggestion",
+                "calendar_month": 10,
+                "calendar_year": 2025
+            },
             content=
             "Excellent! Barcelona in October is a fantastic choice. Now let's coordinate your dates - I need everyone to mark their availability on the calendar below. Click on the dates you're available to travel!"
         ),

@@ -49,7 +49,9 @@ interface ChatMessageProps {
   }>;
   onVote: (data: { optionId: string; emoji: string }) => void;
   onSetAvailability: (data: { date: Date; available: boolean }) => void;
-  onSetBatchAvailability: (dates: Array<{ date: Date; available: boolean }>) => void;
+  onSetBatchAvailability: (
+    dates: Array<{ date: Date; available: boolean }>,
+  ) => void;
   userId: number;
 }
 
@@ -113,9 +115,10 @@ export default function ChatMessage({
   }
 
   if (isAgent) {
-    // Only show calendar when explicitly mentioning "mark their availability on the calendar below"
-    const showCalendar =message.metadata && message.metadata.type === "calendar_suggestion";
-    const showOptions = message.metadata && message.metadata.type === "trip_options";
+    const showCalendar =
+      message.metadata && message.metadata.type === "calendar_suggestion";
+    const showOptions =
+      message.metadata && message.metadata.type === "trip_options";
     const showConflict = message.content.includes("conflict");
 
     // Get options from message metadata if available
@@ -177,7 +180,7 @@ export default function ChatMessage({
                     />
                   ))
                 ) : options.filter((opt) => opt.type === "itinerary").length >
-                0 ? (
+                  0 ? (
                   options
                     .filter((opt) => opt.type === "itinerary")
                     .map((option) => (
