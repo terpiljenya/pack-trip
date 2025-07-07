@@ -113,8 +113,10 @@ export default function CalendarMatrix({
              a.available;
     });
     
-    return dateAvailability
-      .map(a => participants.find(p => p.userId === a.userId))
+    // Get unique users to avoid duplicate keys
+    const uniqueUserIds = [...new Set(dateAvailability.map(a => a.userId))];
+    return uniqueUserIds
+      .map(userId => participants.find(p => p.userId === userId))
       .filter(Boolean);
   };
 
@@ -270,9 +272,9 @@ export default function CalendarMatrix({
                     {availableUsers.length > 0 && (
                       <div className="flex justify-center mt-0.5">
                         <div className="flex -space-x-1">
-                          {availableUsers.slice(0, 3).map((user) => user && (
+                          {availableUsers.slice(0, 3).map((user, userIndex) => user && (
                             <div
-                              key={user.userId}
+                              key={`${date.toISOString()}-${user.userId}-${userIndex}`}
                               className="w-2 h-2 rounded-full border border-background"
                               style={{ backgroundColor: user.color }}
                             />
@@ -296,8 +298,8 @@ export default function CalendarMatrix({
                     {availableUsers.length > 0 ? (
                       <>
                         <p className="text-muted-foreground">Also available:</p>
-                        {availableUsers.filter(u => u && u.userId !== userId).map(user => user && (
-                          <p key={user.userId} className="flex items-center gap-1">
+                        {availableUsers.filter(u => u && u.userId !== userId).map((user, userIndex) => user && (
+                          <p key={`${date.toISOString()}-tooltip-${user.userId}-${userIndex}`} className="flex items-center gap-1">
                             <span 
                               className="w-2 h-2 rounded-full"
                               style={{ backgroundColor: user.color }}
