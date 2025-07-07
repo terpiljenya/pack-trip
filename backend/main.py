@@ -3,15 +3,16 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, Response
 from sqlalchemy.orm import Session
-from typing import Dict, Set
+from typing import Dict, Set, Optional
 import json
 import asyncio
 from datetime import datetime
 import os
 from pathlib import Path
+from sqlalchemy import cast, String
 
 from .database import get_db, engine
-from .models import Base, User, Trip, TripParticipant, Message, Vote, TripOption, DateAvailability, UserPreferences
+from .models import Base, User, Trip, TripParticipant, Message, Vote, DateAvailability, UserPreferences
 from . import schemas
 
 # OpenAI integration
@@ -206,7 +207,8 @@ async def create_message(trip_id: str,
 
 @app.get("/api/trips/{trip_id}/votes", response_model=list[schemas.Vote])
 async def get_votes(trip_id: str, db: Session = Depends(get_db)):
-    votes = db.query(Vote).filter(Vote.trip_id == trip_id).all()
+    votes = db.query(Vote).filter(Vote.trip_id == trip_id,
+                                  Vote.emoji == "👍").all()
     return votes
 
 
@@ -269,13 +271,30 @@ async def check_voting_consensus(trip_id: str, db: Session):
         TripParticipant.trip_id == trip_id).all()
     votes = db.query(Vote).filter(Vote.trip_id == trip_id,
                                   Vote.emoji == "👍").all()
-    options = db.query(TripOption).filter(TripOption.trip_id == trip_id).all()
+    
+    # Find the agent message containing trip options
+    options_message: Optional[Message] = None
+    agent_messages = db.query(Message).filter(
+        Message.trip_id == trip_id,
+        Message.type == "agent",
+        Message.meta_data.isnot(None)
+    ).order_by(Message.timestamp.desc()).all()
+
+    for msg in agent_messages:
+        if isinstance(msg.meta_data, dict) and msg.meta_data.get("type") == "trip_options":
+            options_message = msg
+            break
 
     print(f"DEBUG: Participants: {participants}")
     print(f"DEBUG: Votes: {votes}")
-    print(f"DEBUG: Options: {options}")
+    print(f"DEBUG: Options message: {options_message}")
 
-    if not participants or not votes or not options:
+    if not participants or not votes or not options_message:
+        return
+
+    # Extract options from message metadata
+    options = options_message.meta_data.get("options", [])
+    if not options:
         return
 
     # Group votes by option
@@ -295,7 +314,7 @@ async def check_voting_consensus(trip_id: str, db: Session):
         unique_voters = set(vote.user_id for vote in option_votes)
         if len(unique_voters) == total_participants:
             winning_option = next(
-                (opt for opt in options if opt.option_id == option_id), None)
+                (opt for opt in options if opt["option_id"] == option_id), None)
             break
 
     if winning_option:
@@ -474,7 +493,7 @@ async def generate_trip_options_internal(trip_id: str, consensus_dates: list,
         traceback.print_exc()
 
 
-async def generate_detailed_trip_plan(trip_id: str, winning_option: TripOption,
+async def generate_detailed_trip_plan(trip_id: str, winning_option: dict,
                                       db: Session):
     """Generate detailed trip plan using OpenAI for the winning option."""
     try:
@@ -493,9 +512,9 @@ async def generate_detailed_trip_plan(trip_id: str, winning_option: TripOption,
             "destination":
             trip.destination or "Barcelona",
             "title":
-            winning_option.title,
+            winning_option["title"],
             "description":
-            winning_option.description,
+            winning_option["description"],
             "budget":
             trip.budget,
             "preferences": [{
@@ -706,11 +725,27 @@ async def generate_detailed_trip_plan(trip_id: str, winning_option: TripOption,
         trip.state = "DETAILED_PLAN_READY"
         db.commit()
 
+        # Refresh the message to get the ID
+        db.refresh(db_message)
+
+        # Create message dict manually to ensure proper serialization
+        message_dict = {
+            "content": db_message.content,
+            "type": db_message.type,
+            "meta_data": db_message.meta_data,
+            "id": db_message.id,
+            "trip_id": db_message.trip_id,
+            "user_id": db_message.user_id,
+            "timestamp": db_message.timestamp.isoformat()
+        }
+
+        print(f"DEBUG: Broadcasting detailed plan message: {message_dict}")
+
         # Broadcast the new plan
         await manager.broadcast_to_trip(
             trip_id, {
-                "type": "detailed_plan_ready",
-                "message": schemas.Message.from_orm(db_message).dict(),
+                "type": "new_message",
+                "message": message_dict,
                 "timestamp": datetime.utcnow().isoformat()
             })
 
@@ -718,10 +753,25 @@ async def generate_detailed_trip_plan(trip_id: str, winning_option: TripOption,
         print(f"Error generating detailed plan: {e}")
 
 
-@app.get("/api/trips/{trip_id}/options",
-         response_model=list[schemas.TripOption])
+@app.get("/api/trips/{trip_id}/options")
 async def get_trip_options(trip_id: str, db: Session = Depends(get_db)):
-    options = db.query(TripOption).filter(TripOption.trip_id == trip_id).all()
+    # Find the agent message containing trip options
+    options_message: Optional[Message] = None
+    agent_messages = db.query(Message).filter(
+        Message.trip_id == trip_id,
+        Message.type == "agent",
+        Message.meta_data.isnot(None)
+    ).order_by(Message.timestamp.desc()).all()
+
+    for msg in agent_messages:
+        if isinstance(msg.meta_data, dict) and msg.meta_data.get("type") == "trip_options":
+            options_message = msg
+            break
+
+    if not options_message:
+        return []
+
+    options = options_message.meta_data.get("options", [])
     return options
 
 
@@ -971,8 +1021,8 @@ async def reset_carol(request: dict, db: Session = Depends(get_db)):
     db.query(Trip).filter(Trip.trip_id == trip_id).update(
         {"state": "COLLECTING_DATES"})
 
-    # Delete all trip options
-    db.query(TripOption).filter(TripOption.trip_id == trip_id).delete()
+    # # Delete all trip options
+    # db.query(TripOption).filter(TripOption.trip_id == trip_id).delete()
 
     db.commit()
 
@@ -1213,7 +1263,7 @@ async def startup_event():
             budget_preference="medium",
             accommodation_type="hotel",
             travel_style="cultural",
-            activities=["sightseeing", "museums", "food", "shopping"],
+            activities=["sightseeing", "museums", "food tours", "shopping"],
             dietary_restrictions="Vegetarian",
             special_requirements="Quiet rooms preferred"),
         UserPreferences(user_id=2,
