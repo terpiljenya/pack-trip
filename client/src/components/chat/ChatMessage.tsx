@@ -6,6 +6,7 @@ import CalendarMatrix from "./CalendarMatrix";
 import ConflictBanner from "./ConflictBanner";
 import ItineraryCard from "./ItineraryCard";
 import DetailedPlanCard from "./DetailedPlanCard";
+import LogisticsPlanCard from "./LogisticsPlanCard";
 
 interface ChatMessageProps {
   message: {
@@ -121,6 +122,8 @@ export default function ChatMessage({
       message.metadata && message.metadata.type === "trip_options";
     const showConflict = message.content.includes("conflict");
     const isPending = message.metadata && message.metadata.type === "status_pending";
+    const showLogistics =
+      message.metadata && message.metadata.type === "hotels_flights_plan";
 
     // Get options from message metadata if available
     const messageOptions = message.metadata?.options || [];
@@ -221,6 +224,10 @@ export default function ChatMessage({
                   },
                 ]}
               />
+            )}
+
+            {showLogistics && (
+              <LogisticsPlanCard data={message.metadata.data} />
             )}
           </div>
         </div>

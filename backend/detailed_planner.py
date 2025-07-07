@@ -4,7 +4,7 @@ from datetime import datetime, timedelta
 import httpx
 from sqlalchemy.orm import Session
 
-from .models import Message, Trip, UserPreferences
+from .models import Message, Trip, UserPreferences, TripParticipant, User
 
 # Base URL for external Trip Planner API
 EXTERNAL_API_BASE_URL = os.getenv("EXTERNAL_API_BASE_URL", "http://localhost:8001")
@@ -166,7 +166,135 @@ async def generate_detailed_trip_plan(trip_id: str, winning_option: dict,
                 "timestamp": datetime.utcnow().isoformat()
             })
 
+        # Automatically fetch hotels and flights once the detailed itinerary is ready
+        await generate_hotels_and_flights(trip_id, detailed_plan, db, manager)
+
     except Exception as e:
         raise e
         print(f"Error generating detailed plan: {e}")
         # TODO: Add proper error handling and user notification 
+
+async def generate_hotels_and_flights(trip_id: str, itinerary: dict, db: Session, manager):
+    """Fetch hotels and flights for the generated itinerary using the external Trip Planner API."""
+    try:
+        # Create and broadcast a pending status message
+        pending_msg = Message(
+            trip_id=trip_id,
+            user_id=None,
+            type="agent",
+            content="🔍 Searching for the best hotels and flights for your trip...",
+            meta_data={"type": "status_pending", "status": "generating_hotels_flights"},
+        )
+        db.add(pending_msg)
+        db.commit()
+        db.refresh(pending_msg)
+
+        await manager.broadcast_to_trip(
+            trip_id,
+            {
+                "type": "new_message",
+                "message": {
+                    "id": pending_msg.id,
+                    "trip_id": pending_msg.trip_id,
+                    "user_id": pending_msg.user_id,
+                    "type": pending_msg.type,
+                    "content": pending_msg.content,
+                    "timestamp": pending_msg.timestamp.isoformat(),
+                    "metadata": pending_msg.meta_data,
+                },
+                "timestamp": datetime.utcnow().isoformat(),
+            },
+        )
+
+        # Determine the departure city (fallback to a sensible default)
+        departure_city: str | None = None
+        participants = db.query(TripParticipant).filter(TripParticipant.trip_id == trip_id).all()
+        for participant in participants:
+            user = db.query(User).filter(User.id == participant.user_id).first()
+            if user and user.home_city:
+                departure_city = user.home_city
+                break
+
+        if not departure_city:
+            departure_city = "Paris"  # Default if no home city is set
+
+        payload = {"itinerary": itinerary, "departure_city": departure_city}
+
+        async with httpx.AsyncClient(timeout=200.0) as client:
+            api_resp = await client.post(f"{EXTERNAL_API_BASE_URL}/get_hotels_and_flights", json=payload)
+            api_data = api_resp.json()
+
+        hotels_plan = api_data.get("hotels_plan", {})
+        flights_plan = api_data.get("flights_plan", {})
+
+        print("HOTELS PLAN")
+        print(hotels_plan)
+        print("FLIGHTS PLAN")
+        print(flights_plan)
+
+        # Build a concise summary for the chat message
+        flights_routes = len(flights_plan.get("flights_plans", [])) if flights_plan else 0
+        hotels_total = 0
+        if hotels_plan:
+            for city_listing in hotels_plan.get("hotels_plans", []):
+                hotels_total += len(city_listing.get("listings", []))
+
+        summary_parts = []
+        if flights_routes:
+            summary_parts.append(f"✈️ {flights_routes} flight route(s) found")
+        if hotels_total:
+            summary_parts.append(f"🏨 {hotels_total} hotel option(s) found")
+        summary_text = "\n".join(summary_parts) if summary_parts else "No flights or hotels found."
+
+        # Persist and broadcast the final message
+        final_msg = Message(
+            trip_id=trip_id,
+            user_id=None,
+            type="agent",
+            content=f"📑 **Travel Logistics**\n\n{summary_text}",
+            meta_data={"type": "hotels_flights_plan", "data": api_data},
+        )
+        db.add(final_msg)
+
+        # Update trip state
+        trip = db.query(Trip).filter(Trip.trip_id == trip_id).first()
+        if trip:
+            trip.state = "HOTELS_FLIGHTS_READY"
+
+        db.commit()
+        db.refresh(final_msg)
+
+        # Delete pending message
+        db.query(Message).filter(Message.id == pending_msg.id).delete()
+        db.commit()
+
+        # Broadcast deletion and new message
+        await manager.broadcast_to_trip(
+            trip_id,
+            {
+                "type": "message_deleted",
+                "message_id": pending_msg.id,
+                "timestamp": datetime.utcnow().isoformat(),
+            },
+        )
+
+        await manager.broadcast_to_trip(
+            trip_id,
+            {
+                "type": "new_message",
+                "message": {
+                    "id": final_msg.id,
+                    "trip_id": final_msg.trip_id,
+                    "user_id": final_msg.user_id,
+                    "type": final_msg.type,
+                    "content": final_msg.content,
+                    "timestamp": final_msg.timestamp.isoformat(),
+                    "meta_data": final_msg.meta_data,
+                },
+                "timestamp": datetime.utcnow().isoformat(),
+            },
+        )
+
+    except Exception as e:
+        # Log the error; in production we might notify the user gracefully
+        print(f"Error generating hotels and flights: {e}") 
