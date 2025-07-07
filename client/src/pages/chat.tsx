@@ -53,6 +53,8 @@ export default function ChatPage() {
   const [showPreferencesDialog, setShowPreferencesDialog] = useState(false);
   const { toast } = useToast();
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const messagesContainerRef = useRef<HTMLDivElement>(null);
+  const prevMessageCountRef = useRef(0);
 
   const {
     tripContext,
@@ -69,11 +71,28 @@ export default function ChatPage() {
   
   const tripData = trip as Trip;
 
-  // Auto-scroll to bottom when new messages arrive
+  // Smart auto-scroll: only scroll when user is near bottom or when new messages are added
   useEffect(() => {
-    if (messagesEndRef.current) {
-      messagesEndRef.current.scrollIntoView({ behavior: "smooth" });
+    const messagesContainer = messagesContainerRef.current;
+    const messagesEnd = messagesEndRef.current;
+    
+    if (!messagesContainer || !messagesEnd) return;
+    
+    const currentMessageCount = tripContext.messages.length;
+    const prevMessageCount = prevMessageCountRef.current;
+    
+    // Check if user is near the bottom (within 100px)
+    const isNearBottom = messagesContainer.scrollTop + messagesContainer.clientHeight >= messagesContainer.scrollHeight - 100;
+    
+    // Only auto-scroll if:
+    // 1. New messages were actually added (not just data refetch)
+    // 2. AND user is already near the bottom
+    if (currentMessageCount > prevMessageCount && isNearBottom) {
+      messagesEnd.scrollIntoView({ behavior: "smooth" });
     }
+    
+    // Update the message count reference
+    prevMessageCountRef.current = currentMessageCount;
   }, [tripContext.messages]);
 
   const getStateDisplay = (state: string) => {
@@ -240,7 +259,7 @@ export default function ChatPage() {
         )}
 
         {/* Messages */}
-        <div className="flex-1 overflow-y-auto p-4 space-y-4">
+        <div ref={messagesContainerRef} className="flex-1 overflow-y-auto p-4 space-y-4">
           {tripContext.participants.length > 0 ? (
             <>
               {tripContext.messages.map((message) => (

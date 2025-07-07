@@ -227,7 +227,8 @@ async def join_trip(trip_id: str,
 
     # Create or get user
     display_name = user_info.get("display_name", "").strip()
-    home_city = user_info.get("home_city", "").strip() if user_info.get("home_city") else None
+    home_city = user_info.get(
+        "home_city", "").strip() if user_info.get("home_city") else None
     if not display_name:
         raise HTTPException(status_code=400, detail="Display name is required")
 
@@ -451,13 +452,16 @@ async def create_message(trip_id: str,
                     trip_id=trip_id,
                     user_id=None,  # Agent message
                     type="agent",
-                    content=f"✨ I've noted your preferences: {', '.join(analysis['extracted_preferences'].keys())}. These will help me suggest better options for your trip!",
-                    meta_data={"type": "preferences_extracted", "preferences": analysis["extracted_preferences"]}
-                )
+                    content=
+                    f"✨ I've noted your preferences: {', '.join(analysis['extracted_preferences'].keys())}. These will help me suggest better options for your trip!",
+                    meta_data={
+                        "type": "preferences_extracted",
+                        "preferences": analysis["extracted_preferences"]
+                    })
                 db.add(preferences_message)
                 db.commit()
                 db.refresh(preferences_message)
-                
+
                 # Broadcast preferences notification
                 await manager.broadcast_to_trip(
                     trip_id, {
@@ -468,7 +472,8 @@ async def create_message(trip_id: str,
                             "user_id": preferences_message.user_id,
                             "type": preferences_message.type,
                             "content": preferences_message.content,
-                            "timestamp": preferences_message.timestamp.isoformat(),
+                            "timestamp":
+                            preferences_message.timestamp.isoformat(),
                             "metadata": preferences_message.meta_data
                         },
                         "timestamp": datetime.utcnow().isoformat()
@@ -479,9 +484,9 @@ async def create_message(trip_id: str,
                     trip_id=trip_id,
                     user_id=None,  # Agent message
                     type="agent",
-                    content="✨ I've noted your travel preferences! I'll keep them in mind when planning your trip options.",
-                    meta_data={"type": "raw_preferences_noted"}
-                )
+                    content=
+                    "✨ I've noted your travel preferences! I'll keep them in mind when planning your trip options.",
+                    meta_data={"type": "raw_preferences_noted"})
                 db.add(preferences_message)
                 db.commit()
                 db.refresh(preferences_message)
@@ -686,8 +691,8 @@ async def check_availability_consensus(trip_id: str, db: Session):
 
     # Check if we have enough consensus dates (3 or more)
     if len(consensus_dates) >= 3:
-        await generate_trip_options_internal(trip_id, consensus_dates, db, manager)
-
+        await generate_trip_options_internal(trip_id, consensus_dates, db,
+                                             manager)
 
 
 async def generate_detailed_trip_plan(trip_id: str, winning_option: dict,
@@ -722,7 +727,10 @@ async def generate_detailed_trip_plan(trip_id: str, winning_option: dict,
                 "dietary_restrictions": pref.dietary_restrictions,
                 "raw_preferences": pref.raw_preferences or []
             } for pref in preferences],
-            "all_raw_preferences": [msg for pref in preferences if pref.raw_preferences for msg in pref.raw_preferences]
+            "all_raw_preferences": [
+                msg for pref in preferences if pref.raw_preferences
+                for msg in pref.raw_preferences
+            ]
         }
 
         # the newest OpenAI model is "gpt-4o" which was released May 13, 2024. do not change this unless explicitly requested by the user
@@ -1328,7 +1336,11 @@ async def reset_carol(request: dict, db: Session = Depends(get_db)):
         activities=["sightseeing", "museums", "food tours", "shopping"],
         dietary_restrictions="Vegetarian",
         special_requirements="Quiet rooms preferred",
-        raw_preferences=["I love exploring museums and cultural sites", "I'm vegetarian and prefer quiet accommodations", "Shopping and food tours sound amazing"])
+        raw_preferences=[
+            "I love exploring museums and cultural sites",
+            "I'm vegetarian and prefer quiet accommodations",
+            "Shopping and food tours sound amazing"
+        ])
 
     bob_prefs = UserPreferences(
         user_id=2,
@@ -1339,7 +1351,11 @@ async def reset_carol(request: dict, db: Session = Depends(get_db)):
         activities=["beach", "outdoor activities", "nightlife", "food tours"],
         dietary_restrictions=None,
         special_requirements="Close to nightlife areas",
-        raw_preferences=["I'm all about adventure and outdoor activities", "Beach time would be great", "Let's hit the nightlife scene", "Close to bars and clubs please"])
+        raw_preferences=[
+            "I'm all about adventure and outdoor activities",
+            "Beach time would be great", "Let's hit the nightlife scene",
+            "Close to bars and clubs please"
+        ])
 
     db.add(alice_prefs)
     db.add(bob_prefs)
@@ -1388,19 +1404,18 @@ async def reset_carol(request: dict, db: Session = Depends(get_db)):
     alice_vote = Vote(
         trip_id=trip_id,
         user_id=1,  # Alice
-        option_id="cultural",
+        option_id="option_1",
         emoji="👍")
     db.add(alice_vote)
 
     bob_vote = Vote(
         trip_id=trip_id,
         user_id=2,  # Bob
-        option_id="cultural",
+        option_id="option_1",
         emoji="👍")
     db.add(bob_vote)
 
     db.commit()
-
 
     # Broadcast update to all connected clients
     await manager.broadcast_to_trip(trip_id, {
@@ -1481,7 +1496,11 @@ async def startup_event():
             activities=["sightseeing", "museums", "food tours", "shopping"],
             dietary_restrictions="Vegetarian",
             special_requirements="Quiet rooms preferred",
-            raw_preferences=["I love exploring museums and cultural sites", "I'm vegetarian and prefer quiet accommodations", "Shopping and food tours sound amazing"]),
+            raw_preferences=[
+                "I love exploring museums and cultural sites",
+                "I'm vegetarian and prefer quiet accommodations",
+                "Shopping and food tours sound amazing"
+            ]),
         UserPreferences(user_id=2,
                         trip_id="BCN-2024-001",
                         budget_preference="medium",
@@ -1490,7 +1509,12 @@ async def startup_event():
                         activities=["beach", "outdoors", "nightlife", "food"],
                         dietary_restrictions=None,
                         special_requirements="Close to nightlife areas",
-                        raw_preferences=["I'm all about adventure and outdoor activities", "Beach time would be great", "Let's hit the nightlife scene", "Close to bars and clubs please"])
+                        raw_preferences=[
+                            "I'm all about adventure and outdoor activities",
+                            "Beach time would be great",
+                            "Let's hit the nightlife scene",
+                            "Close to bars and clubs please"
+                        ])
     ]
 
     for pref in preferences:
