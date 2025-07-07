@@ -8,6 +8,7 @@ class UserBase(BaseModel):
     display_name: str
     avatar: Optional[str] = None
     color: Optional[str] = "#2864FF"
+    home_city: Optional[str] = None
 
 class UserCreate(UserBase):
     password: str

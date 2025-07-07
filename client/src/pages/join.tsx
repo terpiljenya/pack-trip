@@ -13,6 +13,7 @@ export default function JoinPage() {
   const params = useParams();
   const [location, setLocation] = useLocation();
   const [displayName, setDisplayName] = useState("");
+  const [homeCity, setHomeCity] = useState("");
   const [isJoining, setIsJoining] = useState(false);
   const { toast } = useToast();
   
@@ -35,17 +36,18 @@ export default function JoinPage() {
   });
 
   // Store user session in localStorage
-  const storeUserSession = (userId: number, displayName: string) => {
+  const storeUserSession = (userId: number, displayName: string, homeCity?: string) => {
     localStorage.setItem("pack_trip_user", JSON.stringify({
       userId,
       displayName,
+      homeCity,
       joinedAt: new Date().toISOString()
     }));
   };
 
   // Join trip mutation
   const joinMutation = useMutation({
-    mutationFn: async (userInfo: { display_name: string }) => {
+    mutationFn: async (userInfo: { display_name: string; home_city?: string }) => {
       const response = await apiRequest("POST", `/api/trips/${tripId}/join?token=${token}`, userInfo);
       if (!response.ok) {
         const errorData = await response.json();
@@ -54,7 +56,7 @@ export default function JoinPage() {
       return response.json();
     },
     onSuccess: (data) => {
-      storeUserSession(data.user_id, displayName);
+      storeUserSession(data.user_id, displayName, homeCity);
       toast({
         title: "Welcome to the trip!",
         description: `You've successfully joined ${tripInfo?.title}`,
@@ -84,7 +86,10 @@ export default function JoinPage() {
 
     setIsJoining(true);
     try {
-      await joinMutation.mutateAsync({ display_name: displayName.trim() });
+      await joinMutation.mutateAsync({ 
+        display_name: displayName.trim(),
+        home_city: homeCity.trim() || undefined
+      });
     } finally {
       setIsJoining(false);
     }
@@ -194,6 +199,18 @@ export default function JoinPage() {
                 onChange={(e) => setDisplayName(e.target.value)}
                 disabled={isJoining}
                 required
+              />
+            </div>
+            
+            <div className="space-y-2">
+              <Label htmlFor="homeCity">Home City</Label>
+              <Input
+                id="homeCity"
+                type="text"
+                placeholder="Enter your home city"
+                value={homeCity}
+                onChange={(e) => setHomeCity(e.target.value)}
+                disabled={isJoining}
               />
             </div>
             

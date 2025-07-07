@@ -14,6 +14,7 @@ class User(Base):
     display_name = Column(String, nullable=False)
     avatar = Column(String, nullable=True)
     color = Column(String, nullable=False, default="#2864FF")
+    home_city = Column(String, nullable=True)
     
     # Relationships
     messages = relationship("Message", back_populates="user")

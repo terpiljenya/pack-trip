@@ -9,6 +9,7 @@ export const users = pgTable("users", {
   displayName: text("display_name").notNull(),
   avatar: text("avatar"),
   color: text("color").notNull().default("#2864FF"),
+  homeCity: text("home_city"),
 });
 
 export const trips = pgTable("trips", {
@@ -82,6 +83,7 @@ export const insertUserSchema = createInsertSchema(users).pick({
   displayName: true,
   avatar: true,
   color: true,
+  homeCity: true,
 });
 
 export const insertTripSchema = createInsertSchema(trips).pick({

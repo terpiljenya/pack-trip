@@ -226,6 +226,7 @@ async def join_trip(trip_id: str,
 
     # Create or get user
     display_name = user_info.get("display_name", "").strip()
+    home_city = user_info.get("home_city", "").strip() if user_info.get("home_city") else None
     if not display_name:
         raise HTTPException(status_code=400, detail="Display name is required")
 
@@ -235,6 +236,10 @@ async def join_trip(trip_id: str,
 
     if existing_user:
         user_id = existing_user.id
+        # Update home_city if provided and different
+        if home_city and existing_user.home_city != home_city:
+            existing_user.home_city = home_city
+            db.commit()
     else:
         # Create new user with simple auth (no password)
         username = display_name.lower().replace(" ", "_")
@@ -257,7 +262,8 @@ async def join_trip(trip_id: str,
             username=username,
             password="",  # No password needed for simple auth
             display_name=display_name,
-            color=user_color)
+            color=user_color,
+            home_city=home_city)
         db.add(new_user)
         db.commit()
         db.refresh(new_user)
