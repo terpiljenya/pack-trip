@@ -20,6 +20,7 @@ export const trips = pgTable("trips", {
   endDate: timestamp("end_date"),
   budget: integer("budget"),
   state: text("state").notNull().default("INIT"),
+  inviteToken: text("invite_token").notNull().unique(),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -31,6 +32,8 @@ export const tripParticipants = pgTable("trip_participants", {
   role: text("role").notNull().default("traveler"),
   isOnline: boolean("is_online").default(false),
   joinedAt: timestamp("joined_at").defaultNow(),
+  hasSubmittedPreferences: boolean("has_submitted_preferences").default(false),
+  hasSubmittedAvailability: boolean("has_submitted_availability").default(false),
 });
 
 export const messages = pgTable("messages", {
