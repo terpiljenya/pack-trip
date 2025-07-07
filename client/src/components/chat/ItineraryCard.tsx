@@ -1,8 +1,9 @@
 import { useState } from 'react';
-import { Card, CardContent } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { Calendar, Clock, MapPin, ChevronDown, ChevronUp, DollarSign } from 'lucide-react';
 import QuickVoteChips from './QuickVoteChips';
 
 interface ItineraryCardProps {
@@ -14,7 +15,26 @@ interface ItineraryCardProps {
     description?: string;
     price?: number;
     image?: string;
-    metadata?: any;
+    metadata?: {
+      duration?: string;
+      start_date?: string;
+      end_date?: string;
+      highlights?: string[];
+      structured_plan?: {
+        duration_days: number;
+        start_date: string;
+        end_date: string;
+        day_plans: Array<{
+          activities: Array<{
+            name: string;
+            description: string;
+            location: string;
+            preliminary_length?: string;
+            cost?: number;
+          }>;
+        }>;
+      };
+    };
   };
   votes: Array<{
     id: number;
@@ -43,6 +63,7 @@ export default function ItineraryCard({
   userId 
 }: ItineraryCardProps) {
   const [imageError, setImageError] = useState(false);
+  const [isExpanded, setIsExpanded] = useState(false);
   
   const votesByEmoji = votes.reduce((acc, vote) => {
     if (!acc[vote.emoji]) {
@@ -75,8 +96,39 @@ export default function ItineraryCard({
     }).filter(Boolean);
   };
 
+  // Extract structured plan data
+  const structuredPlan = option.metadata?.structured_plan;
+  const duration = structuredPlan?.duration_days || option.metadata?.duration;
+  const startDate = structuredPlan?.start_date || option.metadata?.start_date;
+  const endDate = structuredPlan?.end_date || option.metadata?.end_date;
+
+  // Get activity highlights from structured plan
+  const getActivityHighlights = () => {
+    if (!structuredPlan?.day_plans) {
+      return option.metadata?.highlights || [];
+    }
+
+    const highlights: string[] = [];
+    // Take the first activity from each of the first 3 days
+    structuredPlan.day_plans.slice(0, 3).forEach(day => {
+      if (day.activities && day.activities.length > 0) {
+        highlights.push(day.activities[0].name);
+      }
+    });
+    return highlights;
+  };
+
+  const activityHighlights = getActivityHighlights();
+
+  // Format dates for display
+  const formatDate = (dateStr: string) => {
+    if (!dateStr) return '';
+    const date = new Date(dateStr);
+    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  };
+
   return (
-    <Card className="overflow-hidden hover:shadow-lg transition-shadow">
+    <Card className="overflow-hidden hover:shadow-lg transition-shadow border-slate-200">
       {option.image && !imageError && (
         <div className="relative">
           <img 
@@ -95,18 +147,129 @@ export default function ItineraryCard({
         </div>
       )}
       
-      <CardContent className="p-4">
+      <CardHeader className="pb-3">
         <div className="flex items-center justify-between mb-2">
-          <h4 className="font-semibold text-slate-900">{option.title}</h4>
-          {option.price && (
-            <span className="text-lg font-bold text-slate-900">
-              €{option.price.toLocaleString()}
-            </span>
-          )}
+          <CardTitle className="font-semibold text-slate-900 text-lg">{option.title}</CardTitle>
+          <div className="flex items-center gap-2">
+            {option.price && (
+              <span className="text-lg font-bold text-emerald-600">
+                €{option.price.toLocaleString()}
+              </span>
+            )}
+            {structuredPlan && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setIsExpanded(!isExpanded)}
+                className="h-8 px-3"
+              >
+                {isExpanded ? (
+                  <>
+                    <ChevronUp className="w-4 h-4 mr-1" />
+                    Less
+                  </>
+                ) : (
+                  <>
+                    <ChevronDown className="w-4 h-4 mr-1" />
+                    Details
+                  </>
+                )}
+              </Button>
+            )}
+          </div>
         </div>
         
+        {/* Duration and Date Info */}
+        <div className="flex items-center gap-4 text-sm text-slate-600">
+          {duration && (
+            <div className="flex items-center gap-1">
+              <Clock className="w-4 h-4" />
+              <span>{typeof duration === 'string' ? duration : `${duration} days`}</span>
+            </div>
+          )}
+          {startDate && endDate && (
+            <div className="flex items-center gap-1">
+              <Calendar className="w-4 h-4" />
+              <span>{formatDate(startDate)} - {formatDate(endDate)}</span>
+            </div>
+          )}
+        </div>
+      </CardHeader>
+      
+      <CardContent className="pt-0">
         {option.description && (
           <p className="text-sm text-slate-600 mb-3">{option.description}</p>
+        )}
+        
+        {!isExpanded ? (
+          /* Collapsed view - show highlights */
+          activityHighlights.length > 0 && (
+            <div className="mb-4">
+              <h4 className="text-sm font-medium text-slate-700 mb-2">Highlights:</h4>
+              <div className="space-y-1">
+                {activityHighlights.slice(0, 3).map((highlight, index) => (
+                  <div key={index} className="flex items-center gap-2 text-sm text-slate-600">
+                    <MapPin className="w-3 h-3 text-slate-400" />
+                    <span>{highlight}</span>
+                  </div>
+                ))}
+                {activityHighlights.length > 3 && (
+                  <div className="text-xs text-slate-500 ml-5">
+                    +{activityHighlights.length - 3} more activities
+                  </div>
+                )}
+              </div>
+            </div>
+          )
+        ) : (
+          /* Expanded view - show detailed day plans */
+          structuredPlan?.day_plans && (
+            <div className="mb-4 space-y-3">
+              <h4 className="text-sm font-medium text-slate-700">Daily Itinerary:</h4>
+              {structuredPlan.day_plans.map((day, dayIndex) => (
+                <div key={dayIndex} className="border border-slate-200 rounded-lg p-3 bg-slate-50">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Badge variant="outline" className="bg-emerald-100 text-emerald-700 text-xs">
+                      Day {dayIndex + 1}
+                    </Badge>
+                  </div>
+                  <div className="space-y-2">
+                    {day.activities.slice(0, 2).map((activity, actIndex) => (
+                      <div key={actIndex} className="text-sm">
+                        <div className="flex items-start justify-between">
+                          <div className="flex-1">
+                            <div className="font-medium text-slate-800">{activity.name}</div>
+                            <div className="flex items-center gap-1 text-slate-500 text-xs mt-1">
+                              <MapPin className="w-3 h-3" />
+                              <span>{activity.location}</span>
+                              {activity.preliminary_length && (
+                                <>
+                                  <span className="mx-1">•</span>
+                                  <Clock className="w-3 h-3" />
+                                  <span>{activity.preliminary_length}</span>
+                                </>
+                              )}
+                            </div>
+                          </div>
+                          {activity.cost && (
+                            <Badge variant="outline" className="text-xs ml-2">
+                              <DollarSign className="w-3 h-3 mr-1" />
+                              €{activity.cost}
+                            </Badge>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                    {day.activities.length > 2 && (
+                      <div className="text-xs text-slate-500">
+                        +{day.activities.length - 2} more activities this day
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )
         )}
         
         <div className="flex items-center justify-between">
