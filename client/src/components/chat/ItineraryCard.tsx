@@ -154,7 +154,7 @@ export default function ItineraryCard({
         <div className="flex items-center justify-between mb-2">
           <CardTitle className="font-semibold text-slate-900 text-lg">{option.title}</CardTitle>
           <div className="flex items-center gap-2">
-            {option.price && (
+            {option.price !== undefined && option.price > 0 && (
               <div className="flex flex-col items-end">
                 <span className="text-lg font-bold text-emerald-600">
                   €{option.price.toLocaleString()}
@@ -275,7 +275,7 @@ export default function ItineraryCard({
                             )}
                           </div>
                         </div>
-                        {activity.cost && activity.cost > 0 && (
+                        {activity.cost !== undefined && activity.cost > 0 && (
                           <Badge variant="outline" className="text-xs ml-2">
                             €{activity.cost}
                           </Badge>

@@ -91,7 +91,7 @@ export default function LogisticsPlanCard({ data }: LogisticsPlanCardProps) {
                       </div>
                       <div className="text-sm text-slate-600">{flight.duration} min</div>
                       <div className="text-sm text-slate-900 font-semibold">
-                        €{flight.price}
+                        {flight.price}
                       </div>
                       <a
                         href={flight.booking_link}
