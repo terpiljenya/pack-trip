@@ -42,6 +42,7 @@ export default function CalendarMatrix({
   extractedMonth,
   extractedYear
 }: CalendarMatrixProps) {
+  const readOnly = userId === 0;
   // Use extracted month/year if available, otherwise default to current month or October 2024
   const getInitialMonth = () => {
     if (extractedMonth && extractedYear) {
@@ -147,6 +148,7 @@ export default function CalendarMatrix({
   };
 
   const handleDateClick = (date: Date | null) => {
+    if (readOnly) return; // disable interaction in read-only mode
     if (!date || isSubmitting || isLoading) return;
     
     const dateKey = getDateKey(date);
@@ -161,6 +163,7 @@ export default function CalendarMatrix({
   };
 
   const handleSubmit = async () => {
+    if (readOnly) return;
     if (!hasChanges || isSubmitting) return;
     
     setIsSubmitting(true);
@@ -184,6 +187,7 @@ export default function CalendarMatrix({
   };
 
   const handleReset = () => {
+    if (readOnly) return;
     // Reset to current saved state
     const initialSelections: DateSelection = {};
     
@@ -213,7 +217,9 @@ export default function CalendarMatrix({
           <Calendar className="h-4 w-4" />
           <h3 className="font-medium">{format(selectedMonth, 'MMMM yyyy')}</h3>
         </div>
-        <p className="text-xs text-muted-foreground">Select your available dates</p>
+        {!readOnly && (
+          <p className="text-xs text-muted-foreground">Select your available dates</p>
+        )}
       </div>
       
       <TooltipProvider>
@@ -251,7 +257,7 @@ export default function CalendarMatrix({
                 <TooltipTrigger asChild>
                   <button
                     onClick={() => handleDateClick(date)}
-                    disabled={isSubmitting || isLoading}
+                    disabled={isSubmitting || isLoading || readOnly}
                     className={cn(
                       "relative p-2 rounded-md text-sm transition-all",
                       "hover:scale-105 hover:shadow-md",
@@ -320,7 +326,7 @@ export default function CalendarMatrix({
       </TooltipProvider>
       
       {/* Action Buttons */}
-      {hasChanges && (
+      {hasChanges && !readOnly && (
         <div className="flex gap-2 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
           <div className="flex-1">
             <p className="text-sm font-medium text-blue-900 dark:text-blue-100">
@@ -371,12 +377,14 @@ export default function CalendarMatrix({
           </span>
         </div>
         
+        {!readOnly && (
         <div className="text-xs text-muted-foreground space-y-1">
           <p>• Click dates to select your availability</p>
           <p>• Green dates = everyone is available</p>
           <p>• Orange = unsaved changes</p>
           <p>• Click "Save Availability" to confirm your selection</p>
         </div>
+        )}
       </div>
     </div>
   );

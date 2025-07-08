@@ -44,7 +44,14 @@ export default function ChatPage() {
   };
   
   const userSession = getUserSession();
-  const userId = userSession?.userId || 1; // Fallback to user 1 if no session
+  // Determine if we are in demo read-only mode (accessed via ?demo=true)
+  const urlParams = new URLSearchParams(window.location.search);
+  const isDemo = urlParams.get("demo") === "true";
+  // Demo trips are always read-only regardless of stored session
+  const isReadOnly = isDemo;
+
+  // When read-only we pass `0` so hooks skip WebSocket join & mutations
+  const userId = isReadOnly ? 0 : (userSession?.userId || 1);
   
   // Redirect to landing page if no tripId provided
   if (!tripId) {
@@ -73,6 +80,28 @@ export default function ChatPage() {
   } = useTripState(tripId, userId);
   
   const tripData = trip as Trip;
+
+  // Wrap interactive callbacks so they become no-ops in read-only demo mode
+  const sendMessageHandler = isReadOnly
+    ? () => {
+        toast({
+          title: "Read-only demo",
+          description: "Sending messages is disabled in demo mode.",
+        });
+      }
+    : sendMessage;
+
+  const voteHandler = isReadOnly
+    ? (_data: { optionId: string; emoji: string }) => {
+        toast({
+          title: "Read-only demo",
+          description: "Voting is disabled in demo mode.",
+        });
+      }
+    : vote;
+
+  const setAvailabilityHandler = isReadOnly ? () => {} : setAvailability;
+  const setBatchAvailabilityHandler = isReadOnly ? () => {} : setBatchAvailability;
 
   // Smart auto-scroll: only scroll when user is near bottom or when new messages are added
   useEffect(() => {
@@ -190,9 +219,9 @@ export default function ChatPage() {
               <ContextDrawer
                 tripContext={tripContext}
                 trip={tripData}
-                onVote={vote}
-                onSetAvailability={setAvailability}
-                onSetBatchAvailability={setBatchAvailability}
+                onVote={voteHandler}
+                onSetAvailability={setAvailabilityHandler}
+                onSetBatchAvailability={setBatchAvailabilityHandler}
                 userId={userId}
               />
             </SheetContent>
@@ -228,6 +257,7 @@ export default function ChatPage() {
               </div>
             </div>
             <div className="flex items-center space-x-4">
+              {!isReadOnly && (
               <Button
                 variant="ghost"
                 size="sm"
@@ -254,6 +284,7 @@ export default function ChatPage() {
                 <RotateCw className="h-3 w-3 mr-1" />
                 Reset Chat
               </Button>
+              )}
               <Badge className={stateDisplay.color}>
                 <Calendar className="w-3 h-3 mr-1" />
                 {stateDisplay.label}
@@ -289,9 +320,9 @@ export default function ChatPage() {
                   options={tripContext.options}
                   votes={tripContext.votes}
                   availability={tripContext.availability}
-                  onVote={vote}
-                  onSetAvailability={setAvailability}
-                  onSetBatchAvailability={setBatchAvailability}
+                  onVote={voteHandler}
+                  onSetAvailability={setAvailabilityHandler}
+                  onSetBatchAvailability={setBatchAvailabilityHandler}
                   userId={userId}
                 />
               ))}
@@ -303,7 +334,7 @@ export default function ChatPage() {
             </div>
           )}
 
-          {!isConnected && (
+          {!isConnected && !isReadOnly && (
             <div className="text-center py-4">
               <div className="inline-flex items-center px-3 py-1 bg-orange-100 text-orange-800 rounded-full text-sm">
                 <div className="w-2 h-2 bg-orange-500 rounded-full mr-2 animate-pulse"></div>
@@ -314,7 +345,7 @@ export default function ChatPage() {
         </div>
 
         {/* Message Input */}
-        <MessageInput onSendMessage={sendMessage} />
+        {!isReadOnly && <MessageInput onSendMessage={sendMessageHandler} />}
       </div>
 
       {/* Desktop Context Drawer */}
@@ -323,9 +354,9 @@ export default function ChatPage() {
           <ContextDrawer
             tripContext={tripContext}
             trip={tripData}
-            onVote={vote}
-            onSetAvailability={setAvailability}
-            onSetBatchAvailability={setBatchAvailability}
+            onVote={voteHandler}
+            onSetAvailability={setAvailabilityHandler}
+            onSetBatchAvailability={setBatchAvailabilityHandler}
             userId={userId}
           />
         </div>

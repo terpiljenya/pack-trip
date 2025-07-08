@@ -184,7 +184,7 @@ export default function LandingPage() {
           </Card>
 
           {/* Join Demo Trip */}
-          <Card className="cursor-pointer hover:shadow-lg transition-shadow" onClick={() => setLocation("/join/BCN-2024-001?demo=true")}>
+          <Card className="cursor-pointer hover:shadow-lg transition-shadow" onClick={() => setLocation("/trip/BCN-2024-001?demo=true")}>
             <CardContent className="pt-8 pb-8 text-center">
               <div className="w-16 h-16 bg-orange-500 rounded-full flex items-center justify-center mx-auto mb-4">
                 <MapPin className="w-8 h-8 text-white" />
