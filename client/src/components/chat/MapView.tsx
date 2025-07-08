@@ -171,6 +171,7 @@ export default function MapView({ planData, destination }: MapViewProps) {
               !cleanLocation.toLowerCase().includes(cityPlan.city.toLowerCase())
             ) {
               parts.push(cityPlan.city);
+            }
             
             const query = parts.join(", ");
             console.log(

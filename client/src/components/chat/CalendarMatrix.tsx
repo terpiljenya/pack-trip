@@ -115,7 +115,7 @@ export default function CalendarMatrix({
     });
     
     // Get unique users to avoid duplicate keys
-    const uniqueUserIds = [...new Set(dateAvailability.map(a => a.userId))];
+    const uniqueUserIds = Array.from(new Set(dateAvailability.map(a => a.userId)));
     return uniqueUserIds
       .map(userId => participants.find(p => p.userId === userId))
       .filter(Boolean);
