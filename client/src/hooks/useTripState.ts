@@ -499,11 +499,12 @@ export function useTripState(tripId: string, userId: number) {
         const session = localStorage.getItem("pack_trip_user");
         if (session) {
           const parsed = JSON.parse(session);
-          // Only override the name for *this* participant if it matches the
-          // current viewer stored in localStorage. Otherwise keep the name
-          // coming from the backend so we don't overwrite everyone to the
-          // same value.
-          if (Number(parsed.userId) === Number(p.user_id) && parsed.displayName) {
+          // Only fallback to localStorage name when backend didn't send one
+          if (
+            (displayName === "Unknown" || !displayName) &&
+            Number(parsed.userId) === Number(p.user_id) &&
+            parsed.displayName
+          ) {
             displayName = parsed.displayName;
           }
         }
