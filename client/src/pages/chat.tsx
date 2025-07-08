@@ -49,13 +49,38 @@ export default function ChatPage() {
   const isDemo = urlParams.get("demo") === "true";
   // Demo trips are always read-only regardless of stored session
   const isReadOnly = isDemo;
+  
+  // Debug logging
+  console.log("User session debug:", {
+    userSession,
+    isDemo,
+    isReadOnly
+  });
 
   // When read-only we pass `0` so hooks skip WebSocket join & mutations
   const userId = isReadOnly ? 0 : (userSession?.userId || 1);
   
+  // Check if user has a valid session (not read-only and not demo)
+  const hasValidSession = isReadOnly || userSession?.userId;
+  
+  // Debug logging for user ID
+  console.log("User ID debug:", {
+    userId,
+    hasValidSession,
+    userSessionUserId: userSession?.userId,
+    isReadOnly,
+    fallbackUsed: !userSession?.userId && !isReadOnly
+  });
+  
   // Redirect to landing page if no tripId provided
   if (!tripId) {
     window.location.href = "/";
+    return null;
+  }
+  
+  // If not a demo and no valid session, redirect to join page
+  if (!hasValidSession && !isDemo) {
+    window.location.href = `/?join=${tripId}`;
     return null;
   }
   const isMobile = useIsMobile();
@@ -87,6 +112,13 @@ export default function ChatPage() {
         toast({
           title: "Read-only demo",
           description: "Sending messages is disabled in demo mode.",
+        });
+      }
+    : !hasValidSession
+    ? () => {
+        toast({
+          title: "Authentication required",
+          description: "Please rejoin the trip to send messages.",
         });
       }
     : sendMessage;
