@@ -348,7 +348,9 @@ Each option should explain HOW it addresses the group's specific conflicts and e
             }
         )
 
+        # ------------------------------------------------------------------
         # Broadcast the new message
+        # ------------------------------------------------------------------
         message_dict = {
             "content": db_message.content,
             "type": db_message.type,
@@ -359,7 +361,15 @@ Each option should explain HOW it addresses the group's specific conflicts and e
             "timestamp": db_message.timestamp.isoformat()
         }
 
-        print(f"DEBUG: Broadcasting new message: {message_dict}")
+        # Use a safe, lightweight debug log to avoid BlockingIOError when the
+        # stdout buffer is saturated (can happen with very large payloads).
+        # try:
+        #     # Only log the top-level keys – the full metadata can be huge.
+        #     print(f"DEBUG: Broadcasting new message (keys={list(message_dict.keys())})")
+        # except BlockingIOError:
+        #     # If the underlying stdout is busy, silently skip the debug log
+        #     # rather than crashing and preventing the broadcast.
+        #     pass
 
         await manager.broadcast_to_trip(
             trip_id, {

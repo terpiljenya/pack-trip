@@ -708,9 +708,15 @@ async def check_voting_consensus(trip_id: str, db: Session, force_generate: bool
             options_message = msg
             break
 
-    print(f"DEBUG: Participants: {participants}")
-    print(f"DEBUG: Votes: {votes}")
-    print(f"DEBUG: Options message: {options_message}")
+    # Use lightweight debug logs to avoid dumping large objects to stdout. This
+    # prevents BlockingIOError when the stdout pipe is saturated (happens on
+    # Cloud runners with limited buffer size).
+    # try:
+    #     print(
+    #         f"DEBUG: Participants={len(participants)}, Votes={len(votes)}, options_msg_id={(options_message.id if options_message else 'None')}"
+    #     )
+    # except BlockingIOError:
+    #     pass
 
     if not participants or not votes or not options_message:
         return
@@ -727,7 +733,12 @@ async def check_voting_consensus(trip_id: str, db: Session, force_generate: bool
             votes_by_option[vote.option_id] = []
         votes_by_option[vote.option_id].append(vote)
 
-    print(f"DEBUG: Votes by option: {votes_by_option}")
+    try:
+        print(
+            f"DEBUG: Vote groups -> {[ (opt, len(vlist)) for opt, vlist in votes_by_option.items() ]}"
+        )
+    except BlockingIOError:
+        pass
 
     # Check if any option has 100% consensus
     total_participants = len(participants)
@@ -742,7 +753,12 @@ async def check_voting_consensus(trip_id: str, db: Session, force_generate: bool
             break
 
     if winning_option:
-        print(f"DEBUG: Winning option found: {winning_option}")
+        try:
+            print(
+                f"DEBUG: Winning option id={winning_option.get('option_id') if isinstance(winning_option, dict) else 'unknown'}"
+            )
+        except BlockingIOError:
+            pass
 
         # Check if detailed plan already exists
         existing_plan = db.query(Message).filter(

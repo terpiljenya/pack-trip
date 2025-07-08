@@ -169,7 +169,14 @@ async def generate_detailed_trip_plan(trip_id: str, winning_option: dict,
             "timestamp": db_message.timestamp.isoformat()
         }
 
-        print(f"DEBUG: Broadcasting detailed plan message: {message_dict}")
+        # # Avoid writing extremely large payloads to stdout which can raise
+        # # BlockingIOError under heavy load. Log only the top-level keys.
+        # try:
+        #     print(
+        #         f"DEBUG: Broadcasting detailed plan message (keys={list(message_dict.keys())})"  # noqa: E501
+        #     )
+        # except BlockingIOError:
+        #     pass
 
         # Delete the pending message now that we have the real result
         db.query(Message).filter(Message.id == pending_message_id).delete()
