@@ -13,7 +13,7 @@ from sqlalchemy import cast, String
 import secrets
 import httpx
 
-from .database import get_db, engine
+from .database import get_db, engine, retry_db_operation
 from .models import Base, User, Trip, TripParticipant, Message, Vote, DateAvailability, UserPreferences
 from . import schemas
 from .ai_agent import AIAgent
@@ -80,6 +80,32 @@ class ConnectionManager:
 
 manager = ConnectionManager()
 
+# Helper function for database operations with retry logic
+def update_participant_online_status(trip_id: str, user_id: int, is_online: bool) -> bool:
+    """Update participant online status with retry logic and proper error handling"""
+    def db_operation():
+        db = next(get_db())
+        try:
+            participant = db.query(TripParticipant).filter(
+                TripParticipant.trip_id == trip_id,
+                TripParticipant.user_id == user_id).first()
+            if participant:
+                participant.is_online = is_online
+                db.commit()
+                return True
+            return False
+        except Exception as e:
+            db.rollback()
+            raise e
+        finally:
+            db.close()
+    
+    try:
+        return retry_db_operation(db_operation, max_retries=3, delay=1)
+    except Exception as e:
+        print(f"DEBUG: Failed to update participant online status after retries: {e}")
+        return False
+
 
 # WebSocket endpoint
 @app.websocket("/ws")
@@ -100,14 +126,8 @@ async def websocket_endpoint(websocket: WebSocket):
                 )
                 await manager.connect(websocket, trip_id)
 
-                # Update participant online status
-                db = next(get_db())
-                participant = db.query(TripParticipant).filter(
-                    TripParticipant.trip_id == trip_id,
-                    TripParticipant.user_id == user_id).first()
-                if participant:
-                    participant.is_online = True
-                    db.commit()
+                # Update participant online status with retry logic
+                update_participant_online_status(trip_id, user_id, True)
 
                 # Broadcast user joined
                 await manager.broadcast_to_trip(
@@ -119,14 +139,8 @@ async def websocket_endpoint(websocket: WebSocket):
 
             elif data["type"] == "leave_trip":
                 if trip_id and user_id:
-                    # Update participant online status
-                    db = next(get_db())
-                    participant = db.query(TripParticipant).filter(
-                        TripParticipant.trip_id == trip_id,
-                        TripParticipant.user_id == user_id).first()
-                    if participant:
-                        participant.is_online = False
-                        db.commit()
+                    # Update participant online status with retry logic
+                    update_participant_online_status(trip_id, user_id, False)
 
                     manager.disconnect(websocket, trip_id)
 
@@ -152,14 +166,8 @@ async def websocket_endpoint(websocket: WebSocket):
         if trip_id:
             manager.disconnect(websocket, trip_id)
             if user_id:
-                # Update participant online status
-                db = next(get_db())
-                participant = db.query(TripParticipant).filter(
-                    TripParticipant.trip_id == trip_id,
-                    TripParticipant.user_id == user_id).first()
-                if participant:
-                    participant.is_online = False
-                    db.commit()
+                # Update participant online status with retry logic
+                update_participant_online_status(trip_id, user_id, False)
 
                 # Broadcast user left
                 await manager.broadcast_to_trip(
@@ -168,6 +176,10 @@ async def websocket_endpoint(websocket: WebSocket):
                         "userId": user_id,
                         "timestamp": datetime.utcnow().isoformat()
                     })
+    except Exception as e:
+        print(f"DEBUG: Unexpected error in WebSocket endpoint: {e}")
+        if trip_id:
+            manager.disconnect(websocket, trip_id)
 
 
 # API Routes
