@@ -1096,15 +1096,11 @@ async def reset_carol(request: dict, db: Session = Depends(get_db)):
             user_id=1,
             type="user",
             content="Hey everyone! So excited to plan our Barcelona trip 🇪🇸"),
-        Message(trip_id=trip_id,
-                user_id=None,
-                type="system",
-                content="A new traveler has joined the trip planning"),
         Message(
             trip_id=trip_id,
             user_id=2,
             type="user",
-            content="Barcelona sounds amazing! I've always wanted to visit"),
+            content="Barcelona sounds amazing! I've always wanted to visit, but let's also go to Valencia!"),
         Message(
             trip_id=trip_id,
             user_id=1,
@@ -1141,24 +1137,10 @@ async def reset_carol(request: dict, db: Session = Depends(get_db)):
         Message(
             trip_id=trip_id,
             user_id=None,
-            type="system",
-            content=
-            "Alice Johnson has shared their preferences:\n• Budget: medium\n• Accommodation: hotel\n• Travel style: cultural\n• Activities: sightseeing, museums, food tours, shopping\n• Dietary: Vegetarian\n• Special needs: Quiet rooms preferred"
-        ),
-        Message(
-            trip_id=trip_id,
-            user_id=None,
-            type="system",
-            content=
-            "Bob Smith has shared their preferences:\n• Budget: medium\n• Accommodation: hotel\n• Travel style: adventure\n• Activities: beach, outdoor activities, nightlife, food tours\n• Special needs: Close to nightlife areas"
-        ),
-        Message(
-            trip_id=trip_id,
-            user_id=None,
             type="agent",
             content=
-            "Great! I have Alice and Bob's preferences. When new travelers join, please share your travel preferences so I can create the perfect trip for everyone!"
-        )
+            "Great! I have Alice and Bob's preferences. When new travelers join, please share your travel preferences and **select your available dates**!"
+        ),
     ]
 
     for msg in initial_messages:
@@ -1176,8 +1158,8 @@ async def reset_carol(request: dict, db: Session = Depends(get_db)):
         special_requirements="Quiet rooms preferred",
         raw_preferences=[
             "I love exploring museums and cultural sites",
-            "I'm vegetarian and prefer quiet accommodations",
-            "Shopping and food tours sound amazing"
+            # "I'm vegetarian and prefer quiet accommodations",
+            "Food tours sound amazing"
         ])
 
     bob_prefs = UserPreferences(
@@ -1190,9 +1172,9 @@ async def reset_carol(request: dict, db: Session = Depends(get_db)):
         dietary_restrictions=None,
         special_requirements="Close to nightlife areas",
         raw_preferences=[
-            "I'm all about adventure and outdoor activities",
-            "Beach time would be great", "Let's hit the nightlife scene",
-            "Close to bars and clubs please"
+            "I really want to go to Valencia too at least for one day"
+            "Beach time would be great",
+            
         ])
 
     db.add(alice_prefs)
@@ -1230,8 +1212,8 @@ async def reset_carol(request: dict, db: Session = Depends(get_db)):
                                      user_id=2,
                                      date=date,
                                      available=date not in [
-                                         datetime(2025, 10, 15),
-                                         datetime(2025, 10, 16)
+                                         datetime(2025, 10, 19),
+                                         datetime(2025, 10, 20)
                                      ])
         db.add(bob_avail)
 

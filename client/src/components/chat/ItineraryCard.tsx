@@ -275,7 +275,7 @@ export default function ItineraryCard({
                             )}
                           </div>
                         </div>
-                        {activity.cost && (
+                        {activity.cost && activity.cost > 0 && (
                           <Badge variant="outline" className="text-xs ml-2">
                             €{activity.cost}
                           </Badge>
