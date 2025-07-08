@@ -818,30 +818,29 @@ async def check_availability_consensus(trip_id: str, db: Session, force_generate
     if not participants or not availability:
         return
 
-    # Find participants who have submitted any availability data
-    participants_with_availability = set(avail.user_id
-                                         for avail in availability)
+    # ------------------------------------------------------------------
+    # Build a map of availability by date for ALL participants.
+    # A date reaches consensus **only** if every participant in the trip
+    # has explicitly marked themselves as available (True) for that date.
+    # ------------------------------------------------------------------
 
-
-    # Group availability by date
-    availability_by_date = {}
+    # Group availability records by date for quick lookup
+    availability_by_date: dict[str, list[DateAvailability]] = {}
     for avail in availability:
         date_str = avail.date.strftime("%Y-%m-%d")
-        if date_str not in availability_by_date:
-            availability_by_date[date_str] = []
-        availability_by_date[date_str].append(avail)
+        availability_by_date.setdefault(date_str, []).append(avail)
 
-    # Find dates where everyone (who has submitted data) is available
-    total_participants_with_data = len(participants_with_availability)
-    consensus_dates = []
+    total_participants = len(participants)
+    consensus_dates: list[str] = []
 
     for date_str, date_availability in availability_by_date.items():
-        # Count unique participants who are available on this date
-        available_participants = set(avail.user_id
-                                     for avail in date_availability
-                                     if avail.available)
+        # Build a set of participant ids who are available on this date
+        available_participants = {
+            avail.user_id for avail in date_availability if avail.available
+        }
 
-        if len(available_participants) == total_participants_with_data:
+        # A consensus date requires every participant to be available.
+        if len(available_participants) == total_participants:
             consensus_dates.append(date_str)
 
     # Check if we have enough consensus dates (3 or more)
