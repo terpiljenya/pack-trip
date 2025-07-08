@@ -324,6 +324,8 @@ export default function ChatPage() {
                   onSetAvailability={setAvailabilityHandler}
                   onSetBatchAvailability={setBatchAvailabilityHandler}
                   userId={userId}
+                  tripId={tripId}
+                  isReadOnly={isReadOnly}
                 />
               ))}
               <div ref={messagesEndRef} />

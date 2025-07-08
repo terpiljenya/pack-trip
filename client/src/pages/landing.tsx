@@ -109,6 +109,16 @@ export default function LandingPage() {
                 onChange={(e) => setFormData({ ...formData, title: e.target.value })}
               />
             </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="userName">Your Name</Label>
+              <Input
+                id="userName"
+                placeholder="e.g., Alice"
+                value={formData.userName}
+                onChange={(e) => setFormData({ ...formData, userName: e.target.value })}
+              />
+            </div>
             
             <div className="space-y-2">
               <Label htmlFor="budget">Budget per person (optional)</Label>
@@ -121,15 +131,7 @@ export default function LandingPage() {
               />
             </div>
             
-            <div className="space-y-2">
-              <Label htmlFor="userName">Your Name</Label>
-              <Input
-                id="userName"
-                placeholder="e.g., Alice"
-                value={formData.userName}
-                onChange={(e) => setFormData({ ...formData, userName: e.target.value })}
-              />
-            </div>
+            
             
             <div className="flex space-x-2 pt-4">
               <Button

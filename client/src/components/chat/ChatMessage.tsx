@@ -1,4 +1,6 @@
 import { Bot, User, UserPlus, Loader2 } from "lucide-react";
+import { useState } from "react";
+import { Button } from "@/components/ui/button";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import ReactMarkdown from "react-markdown";
@@ -54,6 +56,8 @@ interface ChatMessageProps {
     dates: Array<{ date: Date; available: boolean }>,
   ) => void;
   userId: number;
+  tripId: string;
+  isReadOnly?: boolean;
 }
 
 export default function ChatMessage({
@@ -66,6 +70,8 @@ export default function ChatMessage({
   onSetAvailability,
   onSetBatchAvailability,
   userId,
+  tripId,
+  isReadOnly = false,
 }: ChatMessageProps) {
   // Convert both to numbers to ensure proper comparison
   const participant = participants.find(
@@ -125,6 +131,19 @@ export default function ChatMessage({
     const showLogistics =
       message.metadata && message.metadata.type === "hotels_flights_plan";
 
+    const showGeneratePrompt =
+      message.metadata &&
+      message.metadata.type === "generate_options_prompt" &&
+      !message.metadata.triggered;
+
+    const showDetailedPlanPrompt =
+      message.metadata &&
+      message.metadata.type === "detailed_plan_prompt" &&
+      !message.metadata.triggered;
+
+    const [isTriggering, setIsTriggering] = useState(false);
+    const [isTriggeringPlan, setIsTriggeringPlan] = useState(false);
+
     // Get options from message metadata if available
     const messageOptions = message.metadata?.options || [];
 
@@ -164,6 +183,64 @@ export default function ChatMessage({
                 extractedMonth={message.metadata?.calendar_month}
                 extractedYear={message.metadata?.calendar_year}
               />
+            )}
+
+            {showGeneratePrompt && (
+              <div className="mt-4 text-center">
+                <Button
+                  disabled={isReadOnly || isTriggering}
+                  onClick={async () => {
+                    try {
+                      setIsTriggering(true);
+                      await fetch(`/api/trips/${tripId}/generate-options`, {
+                        method: "POST",
+                      });
+                    } catch (error) {
+                      console.error("Failed to trigger generation", error);
+                    } finally {
+                      setIsTriggering(false);
+                    }
+                  }}
+                >
+                  {isTriggering ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Generating...
+                    </>
+                  ) : (
+                    "Find Trip Options"
+                  )}
+                </Button>
+              </div>
+            )}
+
+            {showDetailedPlanPrompt && (
+              <div className="mt-4 text-center">
+                <Button
+                  disabled={isReadOnly || isTriggeringPlan}
+                  onClick={async () => {
+                    try {
+                      setIsTriggeringPlan(true);
+                      await fetch(`/api/trips/${tripId}/generate-detailed-plan`, {
+                        method: "POST",
+                      });
+                    } catch (error) {
+                      console.error("Failed to trigger detailed plan generation", error);
+                    } finally {
+                      setIsTriggeringPlan(false);
+                    }
+                  }}
+                >
+                  {isTriggeringPlan ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Generating...
+                    </>
+                  ) : (
+                    "Start Deep Research"
+                  )}
+                </Button>
+              </div>
             )}
 
             {showOptions && (

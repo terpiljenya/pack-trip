@@ -548,70 +548,71 @@ async def create_message(trip_id: str,
                     })
 
             # Notify about extracted preferences if any
-            if analysis.get("extracted_preferences"):
-                preferences_message = Message(
-                    trip_id=trip_id,
-                    user_id=None,  # Agent message
-                    type="agent",
-                    content=
-                    f"✨ I've noted your preferences: {', '.join(analysis['extracted_preferences'].keys())}. These will help me suggest better options for your trip!",
-                    meta_data={
-                        "type": "preferences_extracted",
-                        "preferences": analysis["extracted_preferences"]
-                    })
-                db.add(preferences_message)
-                db.commit()
-                db.refresh(preferences_message)
+            # if analysis.get("extracted_preferences"):
+            #     pass
+                # preferences_message = Message(
+                #     trip_id=trip_id,
+                #     user_id=None,  # Agent message
+                #     type="agent",
+                #     content=
+                #     f"✨ I've noted your preferences: {', '.join(analysis['extracted_preferences'].keys())}. These will help me suggest better options for your trip!",
+                #     meta_data={
+                #         "type": "preferences_extracted",
+                #         "preferences": analysis["extracted_preferences"]
+                #     })
+                # db.add(preferences_message)
+                # db.commit()
+                # db.refresh(preferences_message)
 
-                # Broadcast preferences notification
-                await manager.broadcast_to_trip(
-                    trip_id, {
-                        "type": "new_message",
-                        "message": {
-                            "id": preferences_message.id,
-                            "trip_id": preferences_message.trip_id,
-                            "user_id": preferences_message.user_id,
-                            "type": preferences_message.type,
-                            "content": preferences_message.content,
-                            "timestamp":
-                            preferences_message.timestamp.isoformat(),
-                            "metadata": preferences_message.meta_data
-                        },
-                        "timestamp": datetime.utcnow().isoformat()
-                    })
-            elif analysis.get("has_preferences"):
-                # Even if we couldn't extract structured preferences, acknowledge the preferences
-                preferences_message = Message(
-                    trip_id=trip_id,
-                    user_id=None,  # Agent message
-                    type="agent",
-                    content=
-                    "✨ I've noted your travel preferences! I'll keep them in mind when planning your trip options.",
-                    meta_data={"type": "raw_preferences_noted"})
-                db.add(preferences_message)
-                db.commit()
-                db.refresh(preferences_message)
+                # # Broadcast preferences notification
+                # await manager.broadcast_to_trip(
+                #     trip_id, {
+                #         "type": "new_message",
+                #         "message": {
+                #             "id": preferences_message.id,
+                #             "trip_id": preferences_message.trip_id,
+                #             "user_id": preferences_message.user_id,
+                #             "type": preferences_message.type,
+                #             "content": preferences_message.content,
+                #             "timestamp":
+                #             preferences_message.timestamp.isoformat(),
+                #             "metadata": preferences_message.meta_data
+                #         },
+                #         "timestamp": datetime.utcnow().isoformat()
+                #     })
+            # elif analysis.get("has_preferences"):
+            #     # Even if we couldn't extract structured preferences, acknowledge the preferences
+            #     preferences_message = Message(
+            #         trip_id=trip_id,
+            #         user_id=None,  # Agent message
+            #         type="agent",
+            #         content=
+            #         "✨ I've noted your travel preferences! I'll keep them in mind when planning your trip options.",
+            #         meta_data={"type": "raw_preferences_noted"})
+            #     db.add(preferences_message)
+            #     db.commit()
+            #     db.refresh(preferences_message)
 
-                # Broadcast preferences notification
-                await manager.broadcast_to_trip(
-                    trip_id, {
-                        "type": "new_message",
-                        "message": {
-                            "id": preferences_message.id,
-                            "trip_id": preferences_message.trip_id,
-                            "user_id": preferences_message.user_id,
-                            "type": preferences_message.type,
-                            "content": preferences_message.content,
-                            "timestamp":
-                            preferences_message.timestamp.isoformat(),
-                            "metadata": preferences_message.meta_data
-                        },
-                        "timestamp": datetime.utcnow().isoformat()
-                    })
+            #     # Broadcast preferences notification
+            #     await manager.broadcast_to_trip(
+            #         trip_id, {
+            #             "type": "new_message",
+            #             "message": {
+            #                 "id": preferences_message.id,
+            #                 "trip_id": preferences_message.trip_id,
+            #                 "user_id": preferences_message.user_id,
+            #                 "type": preferences_message.type,
+            #                 "content": preferences_message.content,
+            #                 "timestamp":
+            #                 preferences_message.timestamp.isoformat(),
+            #                 "metadata": preferences_message.meta_data
+            #             },
+            #             "timestamp": datetime.utcnow().isoformat()
+            #         })
 
             # If the user explicitly asked to start planning, attempt to generate trip options now.
-            if analysis.get("start_planning"):
-                await check_availability_consensus(trip_id, db, force_generate=True)
+            # if analysis.get("start_planning"):
+            #     await check_availability_consensus(trip_id, db, force_generate=True)
 
         except Exception as e:
             print(f"Error processing message with AI agent: {e}")
@@ -685,7 +686,7 @@ async def create_vote(trip_id: str,
         return schemas.Vote.from_orm(db_vote)
 
 
-async def check_voting_consensus(trip_id: str, db: Session):
+async def check_voting_consensus(trip_id: str, db: Session, force_generate: bool = False):
     """Check if voting consensus has been reached and generate detailed plan if so."""
     # Get all participants and votes
     print(f"DEBUG: Checking voting consensus for trip {trip_id}")
@@ -742,15 +743,68 @@ async def check_voting_consensus(trip_id: str, db: Session):
 
     if winning_option:
         print(f"DEBUG: Winning option found: {winning_option}")
+
         # Check if detailed plan already exists
         existing_plan = db.query(Message).filter(
             Message.trip_id == trip_id,
             Message.type == "detailed_plan").first()
 
-        if not existing_plan:
-            print(f"DEBUG: No existing plan found, generating detailed plan")
-            # Generate detailed plan
+        if existing_plan:
+            return
+
+        if force_generate:
+            # Directly generate detailed plan
             await generate_detailed_trip_plan(trip_id, winning_option, db, manager)
+        else:
+            # Send prompt message if not already present
+            prompt_exists = False
+
+            prompt_candidates = db.query(Message).filter(
+                Message.trip_id == trip_id,
+                Message.type == "agent",
+                Message.meta_data.isnot(None)
+            ).order_by(Message.timestamp.desc()).all()
+
+            for msg in prompt_candidates:
+                if isinstance(msg.meta_data, dict) and msg.meta_data.get("type") == "detailed_plan_prompt":
+                    prompt_exists = True
+                    break
+
+            if not prompt_exists:
+                message_content = "🎉 Fantastic! Everyone's agreed on an itinerary option. When you're ready, click the *Start Deep Research* button below and I'll research the best places to visit and craft a day-by-day schedule!"
+
+                prompt_message = Message(
+                    trip_id=trip_id,
+                    user_id=None,
+                    type="agent",
+                    content=message_content,
+                    meta_data={
+                        "type": "detailed_plan_prompt",
+                        "option_id": winning_option.get("option_id"),
+                        "triggered": False
+                    }
+                )
+                db.add(prompt_message)
+                db.commit()
+                db.refresh(prompt_message)
+
+                # Broadcast prompt
+                await manager.broadcast_to_trip(
+                    trip_id,
+                    {
+                        "type": "new_message",
+                        "message": {
+                            "id": prompt_message.id,
+                            "trip_id": prompt_message.trip_id,
+                            "user_id": prompt_message.user_id,
+                            "type": prompt_message.type,
+                            "content": prompt_message.content,
+                            "timestamp": prompt_message.timestamp.isoformat(),
+                            "metadata": prompt_message.meta_data
+                        },
+                        "timestamp": datetime.utcnow().isoformat()
+                    }
+                )
 
 
 async def check_availability_consensus(trip_id: str, db: Session, force_generate: bool = False):
@@ -791,9 +845,66 @@ async def check_availability_consensus(trip_id: str, db: Session, force_generate
             consensus_dates.append(date_str)
 
     # Check if we have enough consensus dates (3 or more)
-    if len(consensus_dates) >= 3 or force_generate:
-        await generate_trip_options_internal(trip_id, consensus_dates, db,
-                                             manager)
+    # If we already have enough consensus dates, either prompt the group or, if explicitly requested (force_generate), start generation immediately.
+    if len(consensus_dates) >= 3:
+        if force_generate:
+            # Caller explicitly wants to generate now (e.g. user clicked the button)
+            await generate_trip_options_internal(trip_id, consensus_dates, db, manager)
+        else:
+            # Only send a single prompt message to avoid duplicates
+            prompt_exists = False
+
+            prompt_candidates = db.query(Message).filter(
+                Message.trip_id == trip_id,
+                Message.type == "agent",
+                Message.meta_data.isnot(None)
+            ).order_by(Message.timestamp.desc()).all()
+
+            for msg in prompt_candidates:
+                if isinstance(msg.meta_data, dict) and msg.meta_data.get("type") == "generate_options_prompt":
+                    prompt_exists = True
+                    break
+
+            if not prompt_exists:
+                # Adjust message content based on number of participants
+                message_content = "🎉 Great news! We have dates that work for everyone. When you're ready, click the *Find Trip Options* button below and I'll propose some amazing itineraries!"
+                if len(participants) == 1:
+                    message_content = "🎉 Great! I see you've selected your available dates. When you're ready, click the *Find Trip Options* button below and I'll propose some amazing itineraries!"
+
+                prompt_message = Message(
+                    trip_id=trip_id,
+                    user_id=None,
+                    type="agent",
+                    content=message_content,
+                    meta_data={
+                        "type": "generate_options_prompt",
+                        "consensus_dates": consensus_dates
+                    }
+                )
+                db.add(prompt_message)
+                db.commit()
+                db.refresh(prompt_message)
+
+                # Broadcast the prompt so clients can render the button
+                await manager.broadcast_to_trip(
+                    trip_id,
+                    {
+                        "type": "new_message",
+                        "message": {
+                            "id": prompt_message.id,
+                            "trip_id": prompt_message.trip_id,
+                            "user_id": prompt_message.user_id,
+                            "type": prompt_message.type,
+                            "content": prompt_message.content,
+                            "timestamp": prompt_message.timestamp.isoformat(),
+                            "metadata": prompt_message.meta_data
+                        },
+                        "timestamp": datetime.utcnow().isoformat()
+                    }
+                )
+    elif force_generate:
+        # Not enough consensus, but caller insists on generating anyway (edge-case / manual override)
+        await generate_trip_options_internal(trip_id, consensus_dates, db, manager)
 
 
 
@@ -817,6 +928,96 @@ async def get_trip_options(trip_id: str, db: Session = Depends(get_db)):
 
     options = options_message.meta_data.get("options", [])
     return options
+
+# ---------------------------------------------------------------------------
+# Manual trigger for generating detailed trip plan
+# ---------------------------------------------------------------------------
+
+
+@app.post("/api/trips/{trip_id}/generate-detailed-plan")
+async def trigger_generate_detailed_plan(trip_id: str, db: Session = Depends(get_db)):
+    """Endpoint called when the group clicks *Generate Detailed Plan*."""
+
+    # Force generation now
+    await check_voting_consensus(trip_id, db, force_generate=True)
+
+    # Mark any existing detailed plan prompt messages as triggered
+    prompt_messages = db.query(Message).filter(
+        Message.trip_id == trip_id,
+        Message.type == "agent",
+        Message.meta_data.isnot(None)
+    ).all()
+
+    for msg in prompt_messages:
+        if isinstance(msg.meta_data, dict) and msg.meta_data.get("type") == "detailed_plan_prompt" and not msg.meta_data.get("triggered"):
+            msg.meta_data["triggered"] = True
+            db.add(msg)
+            db.commit()
+            db.refresh(msg)
+
+            await manager.broadcast_to_trip(
+                trip_id,
+                {
+                    "type": "update_message",
+                    "message": {
+                        "id": msg.id,
+                        "trip_id": msg.trip_id,
+                        "user_id": msg.user_id,
+                        "type": msg.type,
+                        "content": msg.content,
+                        "timestamp": msg.timestamp.isoformat(),
+                        "metadata": msg.meta_data
+                    },
+                    "timestamp": datetime.utcnow().isoformat()
+                }
+            )
+
+    return {"status": "detailed_plan_generation_requested"}
+
+# ---------------------------------------------------------------------------
+# Manual trigger for generating trip options (restored)
+# ---------------------------------------------------------------------------
+
+
+@app.post("/api/trips/{trip_id}/generate-options")
+async def trigger_generate_trip_options(trip_id: str, db: Session = Depends(get_db)):
+    """Endpoint that clients can call when the group decides it's time to generate itinerary options."""
+
+    # Force generation now
+    await check_availability_consensus(trip_id, db, force_generate=True)
+
+    # Mark any existing generate_options_prompt messages as triggered to hide button
+    prompt_messages = db.query(Message).filter(
+        Message.trip_id == trip_id,
+        Message.type == "agent",
+        Message.meta_data.isnot(None)
+    ).all()
+
+    for msg in prompt_messages:
+        if isinstance(msg.meta_data, dict) and msg.meta_data.get("type") == "generate_options_prompt" and not msg.meta_data.get("triggered"):
+            msg.meta_data["triggered"] = True
+            db.add(msg)
+            db.commit()
+            db.refresh(msg)
+
+            await manager.broadcast_to_trip(
+                trip_id,
+                {
+                    "type": "update_message",
+                    "message": {
+                        "id": msg.id,
+                        "trip_id": msg.trip_id,
+                        "user_id": msg.user_id,
+                        "type": msg.type,
+                        "content": msg.content,
+                        "timestamp": msg.timestamp.isoformat(),
+                        "metadata": msg.meta_data
+                    },
+                    "timestamp": datetime.utcnow().isoformat()
+                }
+            )
+
+    return {"status": "generation_requested"}
 
 
 @app.get("/api/trips/{trip_id}/participants",
@@ -1260,185 +1461,185 @@ async def reset_carol(request: dict, db: Session = Depends(get_db)):
 
 
 # Initialize demo data on startup
-@app.on_event("startup")
-async def startup_event():
-    db = next(get_db())
+# @app.on_event("startup")
+# async def startup_event():
+#     db = next(get_db())
 
-    # Check if demo data already exists
-    if db.query(User).filter(User.username == "alice").first():
-        return
+#     # Check if demo data already exists
+#     if db.query(User).filter(User.username == "alice").first():
+#         return
 
-    # Create demo users
-    users = [
-        User(username="alice",
-             password="password",
-             display_name="Alice Johnson",
-             color="#3B82F6"),
-        User(username="bob",
-             password="password",
-             display_name="Bob Smith",
-             color="#10B981"),
-        User(username="carol",
-             password="password",
-             display_name="Carol Williams",
-             color="#8B5CF6")
-    ]
+#     # Create demo users
+#     users = [
+#         User(username="alice",
+#              password="password",
+#              display_name="Alice Johnson",
+#              color="#3B82F6"),
+#         User(username="bob",
+#              password="password",
+#              display_name="Bob Smith",
+#              color="#10B981"),
+#         User(username="carol",
+#              password="password",
+#              display_name="Carol Williams",
+#              color="#8B5CF6")
+#     ]
 
-    for user in users:
-        db.add(user)
-    db.commit()
+#     for user in users:
+#         db.add(user)
+#     db.commit()
 
-    # Create demo trip
-    demo_trip = Trip(trip_id="BCN-2024-001",
-                     title="Barcelona Trip Planning",
-                     destination="Barcelona",
-                     budget=3600,
-                     state="COLLECTING_DATES",
-                     invite_token=secrets.token_urlsafe(32))
-    db.add(demo_trip)
-    db.commit()
+#     # Create demo trip
+#     demo_trip = Trip(trip_id="BCN-2024-001",
+#                      title="Barcelona Trip Planning",
+#                      destination="Barcelona",
+#                      budget=3600,
+#                      state="COLLECTING_DATES",
+#                      invite_token=secrets.token_urlsafe(32))
+#     db.add(demo_trip)
+#     db.commit()
 
-    # Add participants - Alice and Bob have submitted preferences, Carol hasn't
-    participants = [
-        TripParticipant(trip_id="BCN-2024-001",
-                        user_id=1,
-                        role="organizer",
-                        has_submitted_preferences=True),
-        TripParticipant(trip_id="BCN-2024-001",
-                        user_id=2,
-                        role="traveler",
-                        has_submitted_preferences=True),
-        TripParticipant(trip_id="BCN-2024-001",
-                        user_id=3,
-                        role="traveler",
-                        has_submitted_preferences=False)
-    ]
+#     # Add participants - Alice and Bob have submitted preferences, Carol hasn't
+#     participants = [
+#         TripParticipant(trip_id="BCN-2024-001",
+#                         user_id=1,
+#                         role="organizer",
+#                         has_submitted_preferences=True),
+#         TripParticipant(trip_id="BCN-2024-001",
+#                         user_id=2,
+#                         role="traveler",
+#                         has_submitted_preferences=True),
+#         TripParticipant(trip_id="BCN-2024-001",
+#                         user_id=3,
+#                         role="traveler",
+#                         has_submitted_preferences=False)
+#     ]
 
-    for participant in participants:
-        db.add(participant)
-    db.commit()
+#     for participant in participants:
+#         db.add(participant)
+#     db.commit()
 
-    # Add preferences for Alice and Bob
-    preferences = [
-        UserPreferences(
-            user_id=1,
-            trip_id="BCN-2024-001",
-            budget_preference="medium",
-            accommodation_type="hotel",
-            travel_style="cultural",
-            activities=["sightseeing", "museums", "food tours", "shopping"],
-            dietary_restrictions="Vegetarian",
-            special_requirements="Quiet rooms preferred",
-            raw_preferences=[
-                "I love exploring museums and cultural sites",
-                "I'm vegetarian and prefer quiet accommodations",
-                "Shopping and food tours sound amazing"
-            ]),
-        UserPreferences(user_id=2,
-                        trip_id="BCN-2024-001",
-                        budget_preference="medium",
-                        accommodation_type="hotel",
-                        travel_style="adventure",
-                        activities=["beach", "outdoors", "nightlife", "food"],
-                        dietary_restrictions=None,
-                        special_requirements="Close to nightlife areas",
-                        raw_preferences=[
-                            "I'm all about adventure and outdoor activities",
-                            "Beach time would be great",
-                            "Let's hit the nightlife scene",
-                            "Close to bars and clubs please"
-                        ])
-    ]
+#     # Add preferences for Alice and Bob
+#     preferences = [
+#         UserPreferences(
+#             user_id=1,
+#             trip_id="BCN-2024-001",
+#             budget_preference="medium",
+#             accommodation_type="hotel",
+#             travel_style="cultural",
+#             activities=["sightseeing", "museums", "food tours", "shopping"],
+#             dietary_restrictions="Vegetarian",
+#             special_requirements="Quiet rooms preferred",
+#             raw_preferences=[
+#                 "I love exploring museums and cultural sites",
+#                 "I'm vegetarian and prefer quiet accommodations",
+#                 "Shopping and food tours sound amazing"
+#             ]),
+#         UserPreferences(user_id=2,
+#                         trip_id="BCN-2024-001",
+#                         budget_preference="medium",
+#                         accommodation_type="hotel",
+#                         travel_style="adventure",
+#                         activities=["beach", "outdoors", "nightlife", "food"],
+#                         dietary_restrictions=None,
+#                         special_requirements="Close to nightlife areas",
+#                         raw_preferences=[
+#                             "I'm all about adventure and outdoor activities",
+#                             "Beach time would be great",
+#                             "Let's hit the nightlife scene",
+#                             "Close to bars and clubs please"
+#                         ])
+#     ]
 
-    for pref in preferences:
-        db.add(pref)
-    db.commit()
+#     for pref in preferences:
+#         db.add(pref)
+#     db.commit()
 
-    # Add availability for Alice and Bob
-    from datetime import datetime, timedelta
-    base_date = datetime(2024, 10, 1)
+#     # Add availability for Alice and Bob
+#     from datetime import datetime, timedelta
+#     base_date = datetime(2024, 10, 1)
 
-    # Alice is available Oct 6-7, 13-14, 20-21
-    alice_dates = [6, 7, 13, 14, 20, 21]
-    for day in alice_dates:
-        avail = DateAvailability(trip_id="BCN-2024-001",
-                                 user_id=1,
-                                 date=base_date + timedelta(days=day - 1),
-                                 available=True)
-        db.add(avail)
+#     # Alice is available Oct 6-7, 13-14, 20-21
+#     alice_dates = [6, 7, 13, 14, 20, 21]
+#     for day in alice_dates:
+#         avail = DateAvailability(trip_id="BCN-2024-001",
+#                                  user_id=1,
+#                                  date=base_date + timedelta(days=day - 1),
+#                                  available=True)
+#         db.add(avail)
 
-    # Bob is available Oct 6-7, 13-14 (overlaps with Alice), and 15-16
-    bob_dates = [6, 7, 13, 14, 15, 16]
-    for day in bob_dates:
-        avail = DateAvailability(trip_id="BCN-2024-001",
-                                 user_id=2,
-                                 date=base_date + timedelta(days=day - 1),
-                                 available=True)
-        db.add(avail)
+#     # Bob is available Oct 6-7, 13-14 (overlaps with Alice), and 15-16
+#     bob_dates = [6, 7, 13, 14, 15, 16]
+#     for day in bob_dates:
+#         avail = DateAvailability(trip_id="BCN-2024-001",
+#                                  user_id=2,
+#                                  date=base_date + timedelta(days=day - 1),
+#                                  available=True)
+#         db.add(avail)
 
-    db.commit()
+#     db.commit()
 
-    # Add initial messages
-    messages = [
-        Message(
-            trip_id="BCN-2024-001",
-            user_id=None,
-            type="system",
-            content=
-            "Welcome to TripSync AI! I'm your travel a. I'll help you plan the perfect Barcelona trip with your friends.",
-            meta_data={"tripId": "BCN-2024-001"}),
-        Message(
-            trip_id="BCN-2024-001",
-            user_id=1,
-            type="user",
-            content=
-            "Hey everyone! I'm thinking Barcelona in October, budget around €1200. What do you think? 🌟"
-        ),
-        Message(
-            trip_id="BCN-2024-001",
-            user_id=2,
-            type="user",
-            content=
-            "Perfect! October works for me. I'm flexible on dates but prefer mid-month. Budget looks good too! 👍"
-        ),
-        Message(
-            trip_id="BCN-2024-001",
-            user_id=None,
-            type="agent",
-            meta_data={
-                "type": "calendar_suggestion",
-                "calendar_month": 10,
-                "calendar_year": 2025
-            },
-            content=
-            "Excellent! Barcelona in October is a fantastic choice. Now let's coordinate your dates - I need everyone to mark their availability on the calendar below. Click on the dates you're available to travel!"
-        ),
-        Message(
-            trip_id="BCN-2024-001",
-            user_id=None,
-            type="system",
-            content=
-            "Alice Johnson has shared their preferences:\n• Budget: medium\n• Accommodation: hotel\n• Travel style: cultural\n• Activities: sightseeing, museums, food tours, shopping\n• Dietary: Vegetarian\n• Special needs: Quiet rooms preferred"
-        ),
-        Message(
-            trip_id="BCN-2024-001",
-            user_id=None,
-            type="system",
-            content=
-            "Bob Smith has shared their preferences:\n• Budget: medium\n• Accommodation: hotel\n• Travel style: adventure\n• Activities: beach, outdoor activities, nightlife, food tours\n• Special needs: Close to nightlife areas"
-        ),
-        Message(
-            trip_id="BCN-2024-001",
-            user_id=None,
-            type="agent",
-            content=
-            "Great! I have Alice and Bob's preferences. When new travelers join, please share your travel preferences so I can create the perfect trip for everyone!"
-        )
-    ]
+#     # Add initial messages
+#     messages = [
+#         Message(
+#             trip_id="BCN-2024-001",
+#             user_id=None,
+#             type="system",
+#             content=
+#             "Welcome to TripSync AI! I'm your travel a. I'll help you plan the perfect Barcelona trip with your friends.",
+#             meta_data={"tripId": "BCN-2024-001"}),
+#         Message(
+#             trip_id="BCN-2024-001",
+#             user_id=1,
+#             type="user",
+#             content=
+#             "Hey everyone! I'm thinking Barcelona in October, budget around €1200. What do you think? 🌟"
+#         ),
+#         Message(
+#             trip_id="BCN-2024-001",
+#             user_id=2,
+#             type="user",
+#             content=
+#             "Perfect! October works for me. I'm flexible on dates but prefer mid-month. Budget looks good too! 👍"
+#         ),
+#         Message(
+#             trip_id="BCN-2024-001",
+#             user_id=None,
+#             type="agent",
+#             meta_data={
+#                 "type": "calendar_suggestion",
+#                 "calendar_month": 10,
+#                 "calendar_year": 2025
+#             },
+#             content=
+#             "Excellent! Barcelona in October is a fantastic choice. Now let's coordinate your dates - I need everyone to mark their availability on the calendar below. Click on the dates you're available to travel!"
+#         ),
+#         Message(
+#             trip_id="BCN-2024-001",
+#             user_id=None,
+#             type="system",
+#             content=
+#             "Alice Johnson has shared their preferences:\n• Budget: medium\n• Accommodation: hotel\n• Travel style: cultural\n• Activities: sightseeing, museums, food tours, shopping\n• Dietary: Vegetarian\n• Special needs: Quiet rooms preferred"
+#         ),
+#         Message(
+#             trip_id="BCN-2024-001",
+#             user_id=None,
+#             type="system",
+#             content=
+#             "Bob Smith has shared their preferences:\n• Budget: medium\n• Accommodation: hotel\n• Travel style: adventure\n• Activities: beach, outdoor activities, nightlife, food tours\n• Special needs: Close to nightlife areas"
+#         ),
+#         Message(
+#             trip_id="BCN-2024-001",
+#             user_id=None,
+#             type="agent",
+#             content=
+#             "Great! I have Alice and Bob's preferences. When new travelers join, please share your travel preferences so I can create the perfect trip for everyone!"
+#         )
+#     ]
 
-    for message in messages:
-        db.add(message)
-    db.commit()
+#     for message in messages:
+#         db.add(message)
+#     db.commit()
 
 
 @app.get("/api/geocode")

@@ -291,7 +291,7 @@ Each option should explain HOW it addresses the group's specific conflicts and e
             legacy_options.append(legacy_option)
 
         # Create personalized consensus message
-        consensus_message = f"🎉 **Consensus Reached!**\n\nGreat news! Everyone is available on {len(consensus_dates)} dates. Based on your group's preferences"
+        consensus_message = f"🎉 **Here are some options for your trip!**\n\nEveryone is available on {len(consensus_dates)} dates. Based on your group's preferences"
         consensus_message += f", I've generated 3 personalized itinerary options for your {context['destination']} trip."
         consensus_message += "\n\n✨ **Each option addresses your specific interests and preferences!**\n\nVote for your favorite option below!"
 
