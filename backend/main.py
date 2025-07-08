@@ -11,6 +11,7 @@ import os
 from pathlib import Path
 from sqlalchemy import cast, String
 import secrets
+import httpx
 
 from .database import get_db, engine
 from .models import Base, User, Trip, TripParticipant, Message, Vote, DateAvailability, UserPreferences
@@ -1426,6 +1427,38 @@ async def startup_event():
     for message in messages:
         db.add(message)
     db.commit()
+
+
+@app.get("/api/geocode")
+async def geocode_location(q: str):
+    """Proxy geocoding requests to avoid CORS issues"""
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.get(
+                "https://nominatim.openstreetmap.org/search",
+                params={
+                    "format": "json",
+                    "q": q,
+                    "limit": 1
+                },
+                headers={
+                    "User-Agent": "TripSyncAI/1.0 (+https://TripSync.ai)"
+                }
+            )
+            response.raise_for_status()
+            data = response.json()
+            
+            if data and len(data) > 0:
+                return {
+                    "lat": float(data[0]["lat"]),
+                    "lon": float(data[0]["lon"]),
+                    "display_name": data[0]["display_name"]
+                }
+            else:
+                return {"error": "No results found"}
+                
+    except Exception as e:
+        return {"error": str(e)}
 
 
 # In development mode, proxy to Vite dev server

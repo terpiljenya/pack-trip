@@ -89,6 +89,12 @@ export default function ContextDrawer({
 
   const { toast } = useToast();
 
+  console.log('ContextDrawer debug:', {
+    detailedPlanMessage,
+    detailedPlan,
+    hasCityPlans: detailedPlan?.city_plans?.length > 0
+  });
+
   return (
     <div className="flex flex-col h-full">
       {/* Header */}
