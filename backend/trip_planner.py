@@ -100,13 +100,6 @@ async def generate_trip_options_internal(trip_id: str, consensus_dates: list, db
         if not trip:
             return
 
-        # Check if consensus message already exists
-        existing_message = db.query(Message).filter(
-            Message.trip_id == trip_id, Message.type == "agent",
-            Message.content.like("%Consensus Reached%")).first()
-
-        if existing_message:
-            return
 
         # Add pending status message
         pending_message = Message(
@@ -139,6 +132,32 @@ async def generate_trip_options_internal(trip_id: str, consensus_dates: list, db
         
         # Store pending message ID for later deletion
         pending_message_id = pending_message.id
+
+        # ------------------------------------------------------------------
+        # Hide previous prompt messages with the button (if they still exist)
+        # ------------------------------------------------------------------
+
+        prompt_messages = db.query(Message).filter(
+            Message.trip_id == trip_id,
+            Message.type == "agent",
+            Message.meta_data.isnot(None)
+        ).all()
+
+        for msg in prompt_messages:
+            if isinstance(msg.meta_data, dict) and msg.meta_data.get("type") == "generate_options_prompt":
+                prompt_id = msg.id
+                db.delete(msg)
+                db.commit()
+
+                # Broadcast deletion so clients remove the message
+                await manager.broadcast_to_trip(
+                    trip_id,
+                    {
+                        "type": "message_deleted",
+                        "message_id": prompt_id,
+                        "timestamp": datetime.utcnow().isoformat()
+                    }
+                )
 
         print(f"DEBUG: Starting AI generation for trip {trip_id}")
 

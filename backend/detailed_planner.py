@@ -47,6 +47,32 @@ async def generate_detailed_trip_plan(trip_id: str, winning_option: dict,
         
         # Store pending message ID for later deletion
         pending_message_id = pending_message.id
+
+        # ---------------------------------------------------------------
+        # Remove any existing prompts asking to generate detailed plan
+        # ---------------------------------------------------------------
+
+        prompt_messages = db.query(Message).filter(
+            Message.trip_id == trip_id,
+            Message.type == "agent",
+            Message.meta_data.isnot(None)
+        ).all()
+
+        for msg in prompt_messages:
+            if isinstance(msg.meta_data, dict) and msg.meta_data.get("type") == "detailed_plan_prompt":
+                prompt_id = msg.id
+                db.delete(msg)
+                db.commit()
+
+                # Broadcast deletion so clients remove button prompt
+                await manager.broadcast_to_trip(
+                    trip_id,
+                    {
+                        "type": "message_deleted",
+                        "message_id": prompt_id,
+                        "timestamp": datetime.utcnow().isoformat()
+                    }
+                )
         
         print(f"DEBUG: Starting detailed plan generation for trip {trip_id}")
         
