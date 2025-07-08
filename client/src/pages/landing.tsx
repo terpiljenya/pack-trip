@@ -16,6 +16,7 @@ export default function LandingPage() {
     destination: "",
     title: "",
     budget: "",
+    userName: "",
   });
   const { toast } = useToast();
 
@@ -27,10 +28,10 @@ export default function LandingPage() {
   };
 
   const handleCreateTrip = async () => {
-    if (!formData.destination || !formData.title) {
+    if (!formData.destination || !formData.title || !formData.userName) {
       toast({
         title: "Missing Information",
-        description: "Please fill in destination and title",
+        description: "Please fill in destination, title, and your name",
         variant: "destructive",
       });
       return;
@@ -59,7 +60,7 @@ export default function LandingPage() {
         // Store creator session
         localStorage.setItem("pack_trip_user", JSON.stringify({
           userId: 1, // Creator is always user 1 for now
-          displayName: "Trip Creator",
+          displayName: formData.userName,
           joinedAt: new Date().toISOString()
         }));
         
@@ -117,6 +118,16 @@ export default function LandingPage() {
                 placeholder="e.g., 1200"
                 value={formData.budget}
                 onChange={(e) => setFormData({ ...formData, budget: e.target.value })}
+              />
+            </div>
+            
+            <div className="space-y-2">
+              <Label htmlFor="userName">Your Name</Label>
+              <Input
+                id="userName"
+                placeholder="e.g., Alice"
+                value={formData.userName}
+                onChange={(e) => setFormData({ ...formData, userName: e.target.value })}
               />
             </div>
             

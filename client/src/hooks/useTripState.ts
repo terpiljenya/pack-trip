@@ -492,14 +492,30 @@ export function useTripState(tripId: string, userId: number) {
   const tripContext: TripContext = {
     tripId,
     state: (trip as any)?.state || "INIT",
-    participants: (participants as any[]).map((p: any) => ({
-      id: p.id,
-      userId: p.user_id,
-      displayName: p.user?.display_name || "Unknown",
-      color: p.user?.color || "#2864FF",
-      isOnline: p.is_online,
-      role: p.role,
-    })),
+    participants: (participants as any[]).map((p: any) => {
+      // Attempt to override display name for current user from localStorage
+      let displayName = p.user?.display_name || "Unknown";
+      try {
+        const session = localStorage.getItem("pack_trip_user");
+        if (session) {
+          const parsed = JSON.parse(session);
+          if (Number(parsed.userId) === Number(userId) && parsed.displayName) {
+            displayName = parsed.displayName;
+          }
+        }
+      } catch (err) {
+        console.error("Error reading localStorage session:", err);
+      }
+
+      return {
+        id: p.id,
+        userId: p.user_id,
+        displayName,
+        color: p.user?.color || "#2864FF",
+        isOnline: p.is_online,
+        role: p.role,
+      };
+    }),
     messages: (messages as any[]).map((m: any) => ({
       id: m.id,
       userId: m.user_id,
